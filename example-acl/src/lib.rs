@@ -24,19 +24,54 @@ impl MosquittoPlugin for Test {
             s: topic.to_string(),
         }
     }
-    fn username_password(&mut self, u: &str, p: &str) -> Result<Success, Error> {
+    fn username_password(
+        &mut self,
+        client_id: &str,
+        u: Option<&str>,
+        p: Option<&str>,
+    ) -> Result<Success, Error> {
+        println!("USERNAME_PASSWORD({}) {:?} - {:?}", client_id, u, p);
+        if u.is_none() || p.is_none() {
+            return Err(Error::Auth);
+        }
+        let u = u.unwrap();
+        let p = p.unwrap();
         // this will allow all username/password where the password is the username in reverse
         let rp: String = p.chars().rev().collect();
         if rp == u {
+            // Declare the accepted new client
+            self.broker_broadcast_publish(
+                "new_client",
+                "very_client is a friend. Lets make it feel at home!".as_bytes(),
+                QOS::AtMostOnce,
+                false,
+            )?;
+            // Welcome the new client privately
+            self.broker_publish_to_client(
+                client_id,
+                "greeting",
+                format!("Welcome {}", client_id).as_bytes(),
+                QOS::AtMostOnce,
+                false,
+            )?;
             Ok(Success)
         } else {
+            println!("USERNAME_PASSWORD failed for {}", client_id);
+            // Snitch to all other clients what a bad client that was.
+            self.broker_broadcast_publish(
+                "snitcheroo",
+                format!("{} is a bad bad client. No cookies for it.", client_id).as_bytes(),
+                QOS::AtMostOnce,
+                false,
+            )?;
             Err(Error::Auth)
         }
     }
 
     fn acl_check(
         &mut self,
-        level: i32,
+        client_id: &str,
+        level: AclCheckAccessLevel,
         msg: MosquittoAclMessage,
     ) -> Result<Success, mosquitto_plugin::Error> {
         println!("allowed topic: {}", self.s);
