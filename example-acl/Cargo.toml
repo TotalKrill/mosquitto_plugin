@@ -10,7 +10,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-mosquitto-plugin = { path = "../../mosquitto-plugin" }
+mosquitto-plugin = { path = "../." }
 
 
 
