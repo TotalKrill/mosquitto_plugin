@@ -4,8 +4,10 @@
 #[macro_export]
 macro_rules! create_dynamic_library {
     ($t:ty) => {
+        use mosquitto_dev::mosquitto_client_id;
         use std::os::raw::c_char as Char;
         use std::os::raw::c_int as Int;
+
         fn __assert_sync()
         where
             $t: MosquittoPlugin,
@@ -81,9 +83,25 @@ macro_rules! create_dynamic_library {
             client: *mut mosquitto,
             msg: *const mosquitto_acl_msg,
         ) -> Int {
-            //let level: AccessLevel = access.into();
-            let level = access;
+            let level: AccessLevel = access.into();
+            if (level == AccessLevel::Unknown) {
+                println!("Level {} is unknown", access);
+                return Error::Unknown.into();
+            }
+
+            let level = if let Some(level) = level.into() {
+                level
+            } else {
+                println!("Unexpected access level for acl check. {:?}", level);
+                return Error::Unknown.into();
+            };
+
             let me: &mut $t = unsafe { &mut *(user_data as *mut $t) };
+
+            let client_id = unsafe {
+                let cid = mosquitto_client_id(client);
+                std::ffi::CStr::from_ptr(cid).to_str().unwrap()
+            };
 
             let msg: &mosquitto_acl_msg = unsafe {
                 let msg = msg.as_ref().unwrap();
@@ -109,7 +127,7 @@ macro_rules! create_dynamic_library {
                 retain,
             };
 
-            let res = me.acl_check(level, msg);
+            let res = me.acl_check(client_id, level, msg);
 
             match res {
                 Ok(s) => s.into(),
@@ -126,17 +144,29 @@ macro_rules! create_dynamic_library {
         ) -> Int {
             let me: &mut $t = unsafe { &mut *(user_data as *mut $t) };
 
-            let username: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(username);
-                c_str.to_str().unwrap()
+            let client_id = unsafe {
+                let cid = mosquitto_client_id(client);
+                std::ffi::CStr::from_ptr(cid).to_str().unwrap()
             };
 
-            let password: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(password);
-                c_str.to_str().unwrap()
+            let username: Option<&str> = unsafe {
+                if username.is_null() {
+                    None
+                } else {
+                    let c_str = std::ffi::CStr::from_ptr(username);
+                    Some(c_str.to_str().unwrap())
+                }
+            };
+            let password: Option<&str> = unsafe {
+                if password.is_null() {
+                    None
+                } else {
+                    let c_str = std::ffi::CStr::from_ptr(password);
+                    Some(c_str.to_str().unwrap())
+                }
             };
 
-            let res = me.username_password(username, password);
+            let res = me.username_password(client_id, username, password);
 
             match res {
                 Ok(s) => s.into(),
