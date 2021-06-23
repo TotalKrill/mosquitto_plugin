@@ -1,18 +1,20 @@
 pub mod mosquitto_dev;
 
-pub use mosquitto_dev::{
-    mosquitto, mosquitto_acl_msg, mosquitto_broker_publish, mosquitto_opt, mosquitto_property,
-    mqtt5__property,
-};
+pub use mosquitto_dev::*;
 
 use std::collections::HashMap;
+use std::convert::From;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt;
+
 pub mod dynlib;
+
 pub use dynlib::*;
 pub use libc;
 use libc::c_void;
+use std::net::IpAddr;
+use std::str::FromStr;
 
 pub fn __own_string(ch: *mut std::os::raw::c_char) -> String {
     if !ch.is_null() {
@@ -83,7 +85,7 @@ impl std::fmt::Display for AccessLevel {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum AclCheckAccessLevel {
     Read = 1,
     Write = 2,
@@ -108,7 +110,7 @@ impl Into<Option<AclCheckAccessLevel>> for AccessLevel {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Error {
     AuthContinue = -4,
     NoSubscriber = -3,
@@ -148,8 +150,9 @@ impl Into<i32> for Error {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Success;
+
 impl Into<i32> for Success {
     fn into(self) -> i32 {
         0
@@ -175,7 +178,7 @@ impl Into<i32> for Success {
 // }
 
 #[derive(Debug)]
-pub struct MosquittoAclMessage<'a> {
+pub struct MosquittoMessage<'a> {
     pub topic: &'a str,
     pub payload: &'a [u8],
     pub qos: i32,
@@ -187,12 +190,180 @@ pub enum QOS {
     AtLeastOnce,
     ExactlyOnce,
 }
+
 impl QOS {
     fn to_i32(&self) -> i32 {
         match self {
             QOS::AtMostOnce => 0,
             QOS::AtLeastOnce => 1,
             QOS::ExactlyOnce => 2,
+        }
+    }
+}
+
+pub enum MosquittoClientProtocol {
+    Mqtt,
+    MqttSn,
+    Websockets,
+}
+
+pub enum MosquittoClientProtocolVersion {
+    V3,
+    V4,
+    V5,
+}
+
+pub trait MosquittoClientContext {
+    /// Binding to mosquitto_client_address
+    fn get_address(&self) -> std::net::IpAddr;
+    /// Binding to mosquitto_client_clean_session
+    fn is_clean_session(&self) -> bool;
+    /// Binding to mosquitto_client_id
+    fn get_id(&self) -> String;
+    /// Binding to mosquitto_client_keepalive
+    fn get_keepalive(&self) -> i32;
+    /// Binding to mosquitto_client_certificate
+    fn get_certificate(&self) -> Option<&[u8]>;
+    // TODO replace with a reasonable return type from another lib. openssl or x509_parser maybe?
+    /// Binding to mosquitto_client_protocol
+    fn get_protocol(&self) -> MosquittoClientProtocol;
+    /// Binding to mosquitto_client_protocol_version
+    fn get_protocol_version(&self) -> MosquittoClientProtocolVersion;
+    /// Binding to mosquitto_client_sub_count
+    fn get_sub_count(&self) -> i32;
+    /// Binding to mosquitto_client_username
+    fn get_username(&self) -> String;
+    /// Binding to mosquitto_set_username
+    /// Error is either NoMem or Inval
+    fn set_username(&self, username: String) -> Result<Success, Error>;
+}
+
+pub struct MosquittoClient {
+    pub client: *mut mosquitto
+}
+
+impl MosquittoClientContext for MosquittoClient {
+    fn get_address(&self) -> IpAddr {
+        unsafe {
+            let address = mosquitto_client_address(self.client);
+            let c_str = std::ffi::CStr::from_ptr(address);
+            let str = c_str.to_str().expect("Couldn't convert CStr to &str"); // TODO should we avoid expect here and instead return Option<String>?
+            IpAddr::from_str(str).expect("Couldn't parse ip")
+        }
+    }
+
+    fn is_clean_session(&self) -> bool {
+        unsafe {
+            mosquitto_client_clean_session(self.client)
+        }
+    }
+
+    fn get_id(&self) -> String {
+        unsafe {
+            let client_id = mosquitto_client_id(self.client);
+            let c_str = std::ffi::CStr::from_ptr(client_id);
+            c_str.to_str().expect("Couldn't convert CStr to &str").to_string() // TODO should we avoid expect here and instead return Option<String>?
+        }
+    }
+
+    fn get_keepalive(&self) -> i32 {
+        unsafe {
+            mosquitto_client_keepalive(self.client)
+        }
+    }
+
+    fn get_certificate(&self) -> Option<&[u8]> {
+        unimplemented!()
+    }
+
+    fn get_protocol(&self) -> MosquittoClientProtocol {
+        unsafe {
+            let protocol = mosquitto_client_protocol(self.client) as u32;
+            if protocol == mosquitto_protocol_mp_mqtt {
+                MosquittoClientProtocol::Mqtt
+            } else if protocol == mosquitto_protocol_mp_mqttsn {
+                MosquittoClientProtocol::MqttSn
+            } else if protocol == mosquitto_protocol_mp_websockets {
+                MosquittoClientProtocol::Websockets
+            } else {
+                // TODO either we panic here. Or we need to return a result/option
+                // The benefit of returning the result/option would be to let library-user-space
+                // gracefully shutdown. Which would be preferable.
+
+                panic!("mosquitto_client_protocol returned invalid protocol {}", protocol);
+            }
+        }
+    }
+
+    fn get_protocol_version(&self) -> MosquittoClientProtocolVersion {
+        unsafe {
+            let protocol_version = mosquitto_client_protocol_version(self.client);
+            match protocol_version {
+                3 => MosquittoClientProtocolVersion::V3,
+                4 => MosquittoClientProtocolVersion::V4,
+                5 => MosquittoClientProtocolVersion::V5,
+                _ => panic!("invalid mosquitto client protocol version returned from mosquitto_client_protocol_version. {}", protocol_version)
+            }
+        }
+    }
+
+    fn get_sub_count(&self) -> i32 {
+        unsafe {
+            mosquitto_client_sub_count(self.client) as i32
+        }
+    }
+
+    fn get_username(&self) -> String {
+        unsafe {
+            let username = mosquitto_client_username(self.client);
+            let c_str = std::ffi::CStr::from_ptr(username);
+            c_str.to_str().expect("Couldn't convert CStr to &str").to_string() // TODO should we avoid expect here and instead return Option<String>?
+        }
+    }
+
+    fn set_username(&self, username: String) -> Result<Success, Error> {
+        unsafe {
+            let c_string = &CString::new(username).expect("no cstring for u");
+            let res = mosquitto_set_username(self.client, c_string.as_c_str().as_ptr());
+            match res {
+                0 => Ok(Success),
+                1 => Err(Error::NoMem),
+                3 => Err(Error::Inval),
+                _ => Err(Error::Unknown), // Any other number returned from set_username is undefined behaviour
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum MosquittoPluginEvent {
+    MosqEvtReload = 1,
+    MosqEvtAclCheck = 2,
+    MosqEvtBasicAuth = 3,
+    MosqEvtExtAuthStart = 4,
+    MosqEvtExtAuthContinue = 5,
+    MosqEvtControl = 6,
+    MosqEvtMessage = 7,
+    MosqEvtPskKey = 8,
+    MosqEvtTick = 9,
+    MosqEvtDisconnect = 10,
+    Unknown = -1,
+}
+
+impl From<MosquittoPluginEvent> for i32 {
+    fn from(it: MosquittoPluginEvent) -> i32 {
+        match it {
+            MosquittoPluginEvent::MosqEvtReload => 1,
+            MosquittoPluginEvent::MosqEvtAclCheck => 2,
+            MosquittoPluginEvent::MosqEvtBasicAuth => 3,
+            MosquittoPluginEvent::MosqEvtExtAuthStart => 4,
+            MosquittoPluginEvent::MosqEvtExtAuthContinue => 5,
+            MosquittoPluginEvent::MosqEvtControl => 6,
+            MosquittoPluginEvent::MosqEvtMessage => 7,
+            MosquittoPluginEvent::MosqEvtPskKey => 8,
+            MosquittoPluginEvent::MosqEvtTick => 9,
+            MosquittoPluginEvent::MosqEvtDisconnect => 10,
+            MosquittoPluginEvent::Unknown => -1,
         }
     }
 }
@@ -204,13 +375,19 @@ pub trait MosquittoPlugin {
     /// This requires unsafe usage due to nature of C calls
     fn init(opts: MosquittoOpt) -> Self;
 
+    /// Called when SIGHUP is sent to the broker PID
+    #[allow(unused)]
+    fn on_reload(&mut self, opts: MosquittoOpt) {}
+
     /// Access level checks, default implementation always returns success
+    /// If all acl checks from all plugins returns defer the action should be allowed.
+    /// However that doesn't happen right now, if this returns Err(PluginDefer) for a write the message is not let through.
     #[allow(unused)]
     fn acl_check(
         &mut self,
-        client_id: &str,
+        client: &dyn MosquittoClientContext,
         acl: AclCheckAccessLevel,
-        msg: MosquittoAclMessage,
+        msg: MosquittoMessage,
     ) -> Result<Success, Error> {
         Ok(Success)
     }
@@ -218,12 +395,54 @@ pub trait MosquittoPlugin {
     /// Username and password checks, default implementation always returns success
     fn username_password(
         &mut self,
-        client_id: &str,
+        client: &dyn MosquittoClientContext,
         username: Option<&str>,
         password: Option<&str>,
     ) -> Result<Success, Error> {
         Ok(Success)
     }
+
+    /// Tested unsuccessfully. Haven't gotten this to work yet.
+    /// Suspect it has something to do with how the mosquitto_callback_register is called with the event_data parameter
+    #[allow(unused)]
+    fn on_control(
+        &mut self,
+        client: &dyn MosquittoClientContext,
+        message: MosquittoMessage,
+    ) {}
+
+    /// Called when a message is sent on the broker.
+    /// The message has to pass the ACL check otherwise this callback will not be called.
+    #[allow(unused)]
+    fn on_message(
+        &mut self,
+        client: &dyn MosquittoClientContext,
+        message: MosquittoMessage,
+    ) {}
+
+    /// Untested
+    #[allow(unused)]
+    fn on_psk(
+        &mut self,
+        client: &dyn MosquittoClientContext,
+        hint: &str,
+        identity: &str,
+        key: &str,
+        max_key_len: i32,
+    ) -> i32 {
+        0
+    }
+
+    /// Called every 100 ms
+    /// All now_ns, next_ns, now_s, next_s parameters are always zero right now.
+    /// I'm not sure if it's a bug on this library's part or of mosquitto.
+    /// If you want to keep time you'll have to measure it yourself right now.
+    #[allow(unused)]
+    fn on_tick(&mut self, now_ns: i64, next_ns: i64, now_s: i32, next_s: i32) {}
+
+    #[allow(unused)]
+    fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, reason: i32) {}
+
     #[allow(unused)]
     /// Broadcast a message from the broker
     /// If called in a username and password check the connecting client will not get the message
@@ -275,7 +494,7 @@ pub trait MosquittoPlugin {
         }
     }
     #[allow(unused)]
-    /// To be called from implementations the plugin when
+    /// To be called from implementations of the plugin when
     /// a plugin wants to publish to a specific client.
     fn broker_publish_to_client(
         &mut self,
