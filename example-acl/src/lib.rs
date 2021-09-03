@@ -24,12 +24,14 @@ impl MosquittoPlugin for Test {
             s: topic.to_string(),
         }
     }
+
     fn username_password(
         &mut self,
-        client_id: &str,
+        client: &dyn MosquittoClientContext,
         u: Option<&str>,
         p: Option<&str>,
     ) -> Result<Success, Error> {
+        let client_id = client.get_id();
         println!("USERNAME_PASSWORD({}) {:?} - {:?}", client_id, u, p);
         if u.is_none() || p.is_none() {
             return Err(Error::Auth);
@@ -48,7 +50,7 @@ impl MosquittoPlugin for Test {
             )?;
             // Welcome the new client privately
             self.broker_publish_to_client(
-                client_id,
+                &client_id,
                 "greeting",
                 format!("Welcome {}", client_id).as_bytes(),
                 QOS::AtMostOnce,
@@ -70,9 +72,9 @@ impl MosquittoPlugin for Test {
 
     fn acl_check(
         &mut self,
-        client_id: &str,
+        client: &dyn MosquittoClientContext,
         level: AclCheckAccessLevel,
-        msg: MosquittoAclMessage,
+        msg: MosquittoMessage,
     ) -> Result<Success, mosquitto_plugin::Error> {
         println!("allowed topic: {}", self.s);
         println!("topic: {}", msg.topic);
@@ -86,6 +88,18 @@ impl MosquittoPlugin for Test {
         } else {
             Err(Error::AclDenied)
         }
+    }
+
+    fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, reason: i32) {
+        println!("Plugin on_disconnect, Client {} is disconnecting", client.get_id());
+    }
+
+    fn on_message(
+        &mut self,
+        client: &dyn MosquittoClientContext,
+        message: MosquittoMessage,
+    ) {
+        println!("Plugin on_message: client {}: Topic: {}, Payload: {:?}", client.get_id(), message.topic, message.payload)
     }
 }
 
