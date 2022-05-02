@@ -4,9 +4,9 @@ pub use mosquitto_dev::*;
 
 use std::collections::HashMap;
 use std::convert::From;
-use std::ffi::CStr;
-use std::ffi::CString;
+use std::ffi::{CString, CStr};
 use std::fmt;
+use std::os::raw::c_char;
 
 pub mod dynlib;
 
@@ -477,8 +477,8 @@ pub trait MosquittoPlugin {
              * What happens if it is not successfull? Do i need to free the memory myself? This is a leak if if i front free memory  in all cases except 0 (Success) below?
              */
             let res = mosquitto_broker_publish(
-                nullptr as *const i8, // client id to send to, null = all clients
-                topic as *const i8,
+                nullptr as *const c_char, // client id to send to, null = all clients
+                topic as *const c_char,
                 payload_len as i32, // payload length in bytes, 0 for empty payload
                 c_payload, // payload bytes, non-null if payload length > 0, must be heap allocated
                 qos.to_i32(), // qos
@@ -521,8 +521,8 @@ pub trait MosquittoPlugin {
             payload.copy_to(c_payload, payload_len);
 
             let res = mosquitto_broker_publish(
-                client_id as *const i8, // client id to send to, null = all clients
-                topic as *const i8,     // topic to publish on
+                client_id as *const c_char, // client id to send to, null = all clients
+                topic as *const c_char,     // topic to publish on
                 payload_len as i32,     // payload length in bytes, 0 for empty payload
                 c_payload, // payload bytes, non-null if payload length > 0, must be heap allocated
                 qos.to_i32(), // qos
