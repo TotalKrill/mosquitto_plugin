@@ -239,7 +239,7 @@ pub trait MosquittoClientContext {
 }
 
 pub struct MosquittoClient {
-    pub client: *mut mosquitto
+    pub client: *mut mosquitto,
 }
 
 impl MosquittoClientContext for MosquittoClient {
@@ -253,23 +253,22 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn is_clean_session(&self) -> bool {
-        unsafe {
-            mosquitto_client_clean_session(self.client)
-        }
+        unsafe { mosquitto_client_clean_session(self.client) }
     }
 
     fn get_id(&self) -> String {
         unsafe {
             let client_id = mosquitto_client_id(self.client);
             let c_str = std::ffi::CStr::from_ptr(client_id);
-            c_str.to_str().expect("Couldn't convert CStr to &str").to_string() // TODO should we avoid expect here and instead return Option<String>?
+            c_str
+                .to_str()
+                .expect("Couldn't convert CStr to &str")
+                .to_string() // TODO should we avoid expect here and instead return Option<String>?
         }
     }
 
     fn get_keepalive(&self) -> i32 {
-        unsafe {
-            mosquitto_client_keepalive(self.client)
-        }
+        unsafe { mosquitto_client_keepalive(self.client) }
     }
 
     fn get_certificate(&self) -> Option<&[u8]> {
@@ -290,7 +289,10 @@ impl MosquittoClientContext for MosquittoClient {
                 // The benefit of returning the result/option would be to let library-user-space
                 // gracefully shutdown. Which would be preferable.
 
-                panic!("mosquitto_client_protocol returned invalid protocol {}", protocol);
+                panic!(
+                    "mosquitto_client_protocol returned invalid protocol {}",
+                    protocol
+                );
             }
         }
     }
@@ -308,16 +310,17 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn get_sub_count(&self) -> i32 {
-        unsafe {
-            mosquitto_client_sub_count(self.client) as i32
-        }
+        unsafe { mosquitto_client_sub_count(self.client) as i32 }
     }
 
     fn get_username(&self) -> String {
         unsafe {
             let username = mosquitto_client_username(self.client);
             let c_str = std::ffi::CStr::from_ptr(username);
-            c_str.to_str().expect("Couldn't convert CStr to &str").to_string() // TODO should we avoid expect here and instead return Option<String>?
+            c_str
+                .to_str()
+                .expect("Couldn't convert CStr to &str")
+                .to_string() // TODO should we avoid expect here and instead return Option<String>?
         }
     }
 
@@ -405,20 +408,12 @@ pub trait MosquittoPlugin {
     /// Tested unsuccessfully. Haven't gotten this to work yet.
     /// Suspect it has something to do with how the mosquitto_callback_register is called with the event_data parameter
     #[allow(unused)]
-    fn on_control(
-        &mut self,
-        client: &dyn MosquittoClientContext,
-        message: MosquittoMessage,
-    ) {}
+    fn on_control(&mut self, client: &dyn MosquittoClientContext, message: MosquittoMessage) {}
 
     /// Called when a message is sent on the broker.
     /// The message has to pass the ACL check otherwise this callback will not be called.
     #[allow(unused)]
-    fn on_message(
-        &mut self,
-        client: &dyn MosquittoClientContext,
-        message: MosquittoMessage,
-    ) {}
+    fn on_message(&mut self, client: &dyn MosquittoClientContext, message: MosquittoMessage) {}
 
     /// Untested
     #[allow(unused)]

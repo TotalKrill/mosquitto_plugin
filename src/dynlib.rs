@@ -19,7 +19,7 @@ macro_rules! create_dynamic_library {
         /// external_user_data is the struct defined by the library user.
         struct InternalUserData {
             identifier: *mut c_void,
-            external_user_data: $t
+            external_user_data: $t,
         }
 
         #[no_mangle]
@@ -31,18 +31,30 @@ macro_rules! create_dynamic_library {
         // These function satisfy the types of the C bindings and then call their corresponding safer rust calls.
 
         #[no_mangle]
-        extern "C" fn on_reload_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_reload = unsafe { &mut *(event_data as *mut mosquitto_evt_reload) };
+        extern "C" fn on_reload_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_reload =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_reload) };
             let opts = __from_ptr_and_size(event_data.options, event_data.option_count as _);
             user_data.external_user_data.on_reload(opts);
             0
         }
 
         #[no_mangle]
-        extern "C" fn on_acl_check_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_acl_check = unsafe { &mut *(event_data as *mut mosquitto_evt_acl_check) };
+        extern "C" fn on_acl_check_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_acl_check =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_acl_check) };
             let access_level: AccessLevel = event_data.access.into();
             let access_level = if let Some(level) = access_level.into() {
                 level
@@ -53,11 +65,16 @@ macro_rules! create_dynamic_library {
 
             let topic: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.topic);
-                c_str.to_str().expect("Acl trampoline, failed to create &str from CStr pointer")
+                c_str
+                    .to_str()
+                    .expect("Acl trampoline, failed to create &str from CStr pointer")
             };
 
             let payload: &[u8] = unsafe {
-                std::slice::from_raw_parts(event_data.payload as *const u8, event_data.payloadlen as usize)
+                std::slice::from_raw_parts(
+                    event_data.payload as *const u8,
+                    event_data.payloadlen as usize,
+                )
             };
 
             let msg = MosquittoMessage {
@@ -66,22 +83,36 @@ macro_rules! create_dynamic_library {
                 qos: event_data.qos.into(),
                 retain: event_data.retain,
             };
-            match user_data.external_user_data.acl_check(&MosquittoClient{client: event_data.client}, access_level, msg) {
+            match user_data.external_user_data.acl_check(
+                &MosquittoClient {
+                    client: event_data.client,
+                },
+                access_level,
+                msg,
+            ) {
                 Ok(s) => s.into(),
                 Err(e) => e.into(),
             }
         }
 
         #[no_mangle]
-        extern "C" fn on_basic_auth_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_basic_auth = unsafe { &mut *(event_data as *mut mosquitto_evt_basic_auth) };
+        extern "C" fn on_basic_auth_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_basic_auth =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_basic_auth) };
             let username: Option<&str> = unsafe {
                 if event_data.username.is_null() {
                     None
                 } else {
                     let c_str = std::ffi::CStr::from_ptr(event_data.username);
-                    Some(c_str.to_str().expect("basic auth trampoline failed to create username &str from CStr pointer"))
+                    Some(c_str.to_str().expect(
+                        "basic auth trampoline failed to create username &str from CStr pointer",
+                    ))
                 }
             };
             let password: Option<&str> = unsafe {
@@ -89,41 +120,72 @@ macro_rules! create_dynamic_library {
                     None
                 } else {
                     let c_str = std::ffi::CStr::from_ptr(event_data.password);
-                    Some(c_str.to_str().expect("basic auth trampoline failed to create password &str from CStr pointer"))
+                    Some(c_str.to_str().expect(
+                        "basic auth trampoline failed to create password &str from CStr pointer",
+                    ))
                 }
             };
 
-            match user_data.external_user_data.username_password(&MosquittoClient{client: event_data.client}, username, password) {
+            match user_data.external_user_data.username_password(
+                &MosquittoClient {
+                    client: event_data.client,
+                },
+                username,
+                password,
+            ) {
                 Ok(r) => r.into(),
                 Err(e) => e.into(),
             }
         }
 
         #[no_mangle]
-        extern "C" fn on_auth_start_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_extended_auth = unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
+        extern "C" fn on_auth_start_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_extended_auth =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
             unimplemented!();
         }
 
         #[no_mangle]
-        extern "C" fn on_auth_continue_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_extended_auth = unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
+        extern "C" fn on_auth_continue_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_extended_auth =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
             unimplemented!();
         }
 
         #[no_mangle]
-        extern "C" fn on_control_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_control = unsafe { &mut *(event_data as *mut mosquitto_evt_control) };
+        extern "C" fn on_control_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_control =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_control) };
             let topic: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.topic);
-                c_str.to_str().expect("control trampoline failed to create topic &str from CStr pointer")
+                c_str
+                    .to_str()
+                    .expect("control trampoline failed to create topic &str from CStr pointer")
             };
 
             let payload: &[u8] = unsafe {
-                std::slice::from_raw_parts(event_data.payload as *const u8, event_data.payloadlen as usize)
+                std::slice::from_raw_parts(
+                    event_data.payload as *const u8,
+                    event_data.payloadlen as usize,
+                )
             };
 
             let msg = MosquittoMessage {
@@ -133,21 +195,37 @@ macro_rules! create_dynamic_library {
                 retain: event_data.retain,
             };
 
-            user_data.external_user_data.on_control(&MosquittoClient{client: event_data.client}, msg);
+            user_data.external_user_data.on_control(
+                &MosquittoClient {
+                    client: event_data.client,
+                },
+                msg,
+            );
             0
         }
 
         #[no_mangle]
-        extern "C" fn on_message_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_message = unsafe { &mut *(event_data as *mut mosquitto_evt_message) };
+        extern "C" fn on_message_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_message =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_message) };
             let topic: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.topic);
-                c_str.to_str().expect("message trampoline failed to create topic &str from CStr pointer")
+                c_str
+                    .to_str()
+                    .expect("message trampoline failed to create topic &str from CStr pointer")
             };
 
             let payload: &[u8] = unsafe {
-                std::slice::from_raw_parts(event_data.payload as *const u8, event_data.payloadlen as usize)
+                std::slice::from_raw_parts(
+                    event_data.payload as *const u8,
+                    event_data.payloadlen as usize,
+                )
             };
 
             let msg = MosquittoMessage {
@@ -157,51 +235,97 @@ macro_rules! create_dynamic_library {
                 retain: event_data.retain,
             };
 
-            user_data.external_user_data.on_message(&MosquittoClient{client: event_data.client}, msg);
+            user_data.external_user_data.on_message(
+                &MosquittoClient {
+                    client: event_data.client,
+                },
+                msg,
+            );
             0
         }
 
         #[no_mangle]
-        extern "C" fn on_psk_key_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_psk_key = unsafe { &mut *(event_data as *mut mosquitto_evt_psk_key) };
+        extern "C" fn on_psk_key_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_psk_key =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_psk_key) };
 
             let hint: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.hint);
-                c_str.to_str().expect("psk key trampoline failed to create hint &str from CStr pointer")
+                c_str
+                    .to_str()
+                    .expect("psk key trampoline failed to create hint &str from CStr pointer")
             };
 
             let identity: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.identity);
-                c_str.to_str().expect("psk key trampoline failed to create identity &str from CStr pointer")
+                c_str
+                    .to_str()
+                    .expect("psk key trampoline failed to create identity &str from CStr pointer")
             };
 
             let key: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.key);
-                c_str.to_str().expect("psk key trampoline failed to create key &str from CStr pointer")
+                c_str
+                    .to_str()
+                    .expect("psk key trampoline failed to create key &str from CStr pointer")
             };
 
-            user_data.external_user_data.on_psk(&MosquittoClient{client: event_data.client}, hint, identity, key, event_data.max_key_len as i32)
+            user_data.external_user_data.on_psk(
+                &MosquittoClient {
+                    client: event_data.client,
+                },
+                hint,
+                identity,
+                key,
+                event_data.max_key_len as i32,
+            )
         }
 
         #[no_mangle]
-        extern "C" fn on_tick_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_tick = unsafe { &mut *(event_data as *mut mosquitto_evt_tick) };
+        extern "C" fn on_tick_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let event_data: &mut mosquitto_evt_tick =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_tick) };
 
-            user_data.external_user_data.on_tick(event_data.now_ns as i64, event_data.next_ns as i64, event_data.now_s as i32, event_data.next_s as i32);
+            user_data.external_user_data.on_tick(
+                event_data.now_ns as i64,
+                event_data.next_ns as i64,
+                event_data.now_s as i32,
+                event_data.next_s as i32,
+            );
             0
         }
 
         #[no_mangle]
-        extern "C" fn on_disconnect_trampoline(_event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
+        extern "C" fn on_disconnect_trampoline(
+            _event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
 
-            let event_data: &mut mosquitto_evt_disconnect = unsafe { &mut *(event_data as *mut mosquitto_evt_disconnect) };
-            user_data.external_user_data.on_disconnect(&MosquittoClient{client: event_data.client}, event_data.reason);
+            let event_data: &mut mosquitto_evt_disconnect =
+                unsafe { &mut *(event_data as *mut mosquitto_evt_disconnect) };
+            user_data.external_user_data.on_disconnect(
+                &MosquittoClient {
+                    client: event_data.client,
+                },
+                event_data.reason,
+            );
             0
         }
-
 
         #[no_mangle]
         pub extern "C" fn mosquitto_plugin_init(
@@ -216,7 +340,10 @@ macro_rules! create_dynamic_library {
             let instance: $t = <$t>::init(opts);
             let instance = instance;
             println!("external_user_data addr {:?}", instance);
-            let internal_user_data = InternalUserData{identifier, external_user_data: instance};
+            let internal_user_data = InternalUserData {
+                identifier,
+                external_user_data: instance,
+            };
             let internal_user_data = Box::new(internal_user_data);
             let instance_rawptr: *mut InternalUserData = Box::into_raw(internal_user_data);
 
@@ -307,10 +434,16 @@ macro_rules! create_dynamic_library {
             opt_count: c_int,
         ) -> c_int {
             let opts = __from_ptr_and_size(opts, opt_count as _);
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
 
             unsafe {
-                mosquitto_callback_unregister(user_data.identifier as _, MosquittoPluginEvent::MosqEvtDisconnect as _, Some(on_disconnect_trampoline), std::ptr::null());
+                mosquitto_callback_unregister(
+                    user_data.identifier as _,
+                    MosquittoPluginEvent::MosqEvtDisconnect as _,
+                    Some(on_disconnect_trampoline),
+                    std::ptr::null(),
+                );
             }
             println!("plugincleanup 2");
 
