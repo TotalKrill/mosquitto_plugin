@@ -1,28 +1,19 @@
+pub mod mosquitto_calls;
 pub mod mosquitto_dev;
 
 pub use mosquitto_dev::*;
 
 use std::collections::HashMap;
 use std::convert::From;
-use std::ffi::{CString, CStr};
+use std::ffi::CString;
 use std::fmt;
-use std::os::raw::c_char;
 
 pub mod dynlib;
 
 pub use dynlib::*;
 pub use libc;
-use libc::c_void;
 use std::net::IpAddr;
 use std::str::FromStr;
-
-pub fn __own_string(ch: *mut std::os::raw::c_char) -> String {
-    if !ch.is_null() {
-        unsafe { CStr::from_ptr(ch).to_string_lossy().into_owned() }
-    } else {
-        "".to_string()
-    }
-}
 
 pub type MosquittoOpt<'a> = HashMap<&'a str, &'a str>;
 
@@ -39,7 +30,6 @@ pub fn __from_ptr_and_size<'a>(opts: *mut mosquitto_opt, count: usize) -> Mosqui
         };
 
         // get a reference, and then use this to parse the values into owned strings
-        //let key = __own_string(opt.key);
         let key: &str = unsafe {
             let c_str = std::ffi::CStr::from_ptr(opt.key);
             c_str.to_str().unwrap()
@@ -192,7 +182,7 @@ pub enum QOS {
 }
 
 impl QOS {
-    fn to_i32(&self) -> i32 {
+    pub fn to_i32(&self) -> i32 {
         match self {
             QOS::AtMostOnce => 0,
             QOS::AtLeastOnce => 1,
@@ -239,7 +229,7 @@ pub trait MosquittoClientContext {
 }
 
 pub struct MosquittoClient {
-    pub client: *mut mosquitto
+    pub client: *mut mosquitto,
 }
 
 impl MosquittoClientContext for MosquittoClient {
@@ -253,23 +243,22 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn is_clean_session(&self) -> bool {
-        unsafe {
-            mosquitto_client_clean_session(self.client)
-        }
+        unsafe { mosquitto_client_clean_session(self.client) }
     }
 
     fn get_id(&self) -> String {
         unsafe {
             let client_id = mosquitto_client_id(self.client);
             let c_str = std::ffi::CStr::from_ptr(client_id);
-            c_str.to_str().expect("Couldn't convert CStr to &str").to_string() // TODO should we avoid expect here and instead return Option<String>?
+            c_str
+                .to_str()
+                .expect("Couldn't convert CStr to &str")
+                .to_string() // TODO should we avoid expect here and instead return Option<String>?
         }
     }
 
     fn get_keepalive(&self) -> i32 {
-        unsafe {
-            mosquitto_client_keepalive(self.client)
-        }
+        unsafe { mosquitto_client_keepalive(self.client) }
     }
 
     fn get_certificate(&self) -> Option<&[u8]> {
@@ -290,7 +279,10 @@ impl MosquittoClientContext for MosquittoClient {
                 // The benefit of returning the result/option would be to let library-user-space
                 // gracefully shutdown. Which would be preferable.
 
-                panic!("mosquitto_client_protocol returned invalid protocol {}", protocol);
+                panic!(
+                    "mosquitto_client_protocol returned invalid protocol {}",
+                    protocol
+                );
             }
         }
     }
@@ -308,16 +300,17 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn get_sub_count(&self) -> i32 {
-        unsafe {
-            mosquitto_client_sub_count(self.client) as i32
-        }
+        unsafe { mosquitto_client_sub_count(self.client) as i32 }
     }
 
     fn get_username(&self) -> String {
         unsafe {
             let username = mosquitto_client_username(self.client);
             let c_str = std::ffi::CStr::from_ptr(username);
-            c_str.to_str().expect("Couldn't convert CStr to &str").to_string() // TODO should we avoid expect here and instead return Option<String>?
+            c_str
+                .to_str()
+                .expect("Couldn't convert CStr to &str")
+                .to_string() // TODO should we avoid expect here and instead return Option<String>?
         }
     }
 
@@ -405,20 +398,12 @@ pub trait MosquittoPlugin {
     /// Tested unsuccessfully. Haven't gotten this to work yet.
     /// Suspect it has something to do with how the mosquitto_callback_register is called with the event_data parameter
     #[allow(unused)]
-    fn on_control(
-        &mut self,
-        client: &dyn MosquittoClientContext,
-        message: MosquittoMessage,
-    ) {}
+    fn on_control(&mut self, client: &dyn MosquittoClientContext, message: MosquittoMessage) {}
 
     /// Called when a message is sent on the broker.
     /// The message has to pass the ACL check otherwise this callback will not be called.
     #[allow(unused)]
-    fn on_message(
-        &mut self,
-        client: &dyn MosquittoClientContext,
-        message: MosquittoMessage,
-    ) {}
+    fn on_message(&mut self, client: &dyn MosquittoClientContext, message: MosquittoMessage) {}
 
     /// Untested
     #[allow(unused)]
@@ -442,101 +427,6 @@ pub trait MosquittoPlugin {
 
     #[allow(unused)]
     fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, reason: i32) {}
-
-    #[allow(unused)]
-    /// Broadcast a message from the broker
-    /// If called in a username and password check the connecting client will not get the message
-    /// Use the broker_publish_to_client combined with this if you want to send to all clients including the one that is connecting
-    fn broker_broadcast_publish(
-        &mut self,
-        topic: &str,
-        payload: &[u8],
-        qos: QOS,
-        retain: bool,
-    ) -> Result<Success, Error> {
-        let cstr = &CString::new(topic).expect("no cstring for u");
-        let bytes = cstr.as_bytes_with_nul();
-        let topic = bytes.as_ptr();
-
-        let mut nullptr: *const c_void = std::ptr::null();
-        let properties: *mut mosquitto_property = std::ptr::null_mut();
-
-        // let payload: *mut c_void = std::ptr::null_mut(); // payload bytes, non-null if payload length > 0, must be heap allocated
-        let payload_len = payload.len();
-        let payload: *const c_void = Box::new(payload).as_ptr() as *const c_void; // payload bytes, non-null if payload length > 0, must be heap allocated
-
-        unsafe {
-            let c_payload: *mut c_void =
-                libc::malloc(std::mem::size_of::<u8>() * payload_len) as *mut c_void;
-            payload.copy_to(c_payload, payload_len);
-            /**
-             * https://mosquitto.org/api2/files/mosquitto_broker-h.html#mosquitto_broker_publish
-             * maybe want to switch to mosquitto_broker_publish to maintain ownership over
-             * payload memory.
-             * "payload	payload bytes.  If payloadlen > 0 this must not be NULL.  Must be allocated on the heap.  Will be freed by mosquitto after use if the function returns success."
-             * What happens if it is not successfull? Do i need to free the memory myself? This is a leak if if i front free memory  in all cases except 0 (Success) below?
-             */
-            let res = mosquitto_broker_publish(
-                nullptr as *const c_char, // client id to send to, null = all clients
-                topic as *const c_char,
-                payload_len as i32, // payload length in bytes, 0 for empty payload
-                c_payload, // payload bytes, non-null if payload length > 0, must be heap allocated
-                qos.to_i32(), // qos
-                retain,    // retain
-                properties, //mqtt5 properties
-            );
-            match res {
-                0 => Ok(Success),
-                1 => Err(Error::NoMem),
-                3 => Err(Error::Inval),
-                default => Err(Error::Unknown),
-            }
-        }
-    }
-    #[allow(unused)]
-    /// To be called from implementations of the plugin when
-    /// a plugin wants to publish to a specific client.
-    fn broker_publish_to_client(
-        &mut self,
-        client_id: &str,
-        topic: &str,
-        payload: &[u8],
-        qos: QOS,
-        retain: bool,
-    ) -> Result<Success, Error> {
-        let cstr = &CString::new(client_id).expect("no cstring for u");
-        let bytes = cstr.as_bytes_with_nul();
-        let client_id = bytes.as_ptr();
-
-        let cstr = &CString::new(topic).expect("no cstring for u");
-        let bytes = cstr.as_bytes_with_nul();
-        let topic = bytes.as_ptr();
-
-        let payload_len = payload.len();
-        let payload: *const c_void = Box::new(payload).as_ptr() as *const c_void;
-
-        unsafe {
-            let c_payload: *mut c_void =
-                libc::malloc(std::mem::size_of::<u8>() * payload_len) as *mut c_void;
-            payload.copy_to(c_payload, payload_len);
-
-            let res = mosquitto_broker_publish(
-                client_id as *const c_char, // client id to send to, null = all clients
-                topic as *const c_char,     // topic to publish on
-                payload_len as i32,     // payload length in bytes, 0 for empty payload
-                c_payload, // payload bytes, non-null if payload length > 0, must be heap allocated
-                qos.to_i32(), // qos
-                retain,    // retain
-                std::ptr::null_mut(), //mqtt5 properties
-            );
-            match res {
-                0 => Ok(Success),
-                1 => Err(Error::NoMem),
-                3 => Err(Error::Inval),
-                default => Err(Error::Unknown),
-            }
-        }
-    }
 }
 
 // #[derive(Debug)]
