@@ -5,6 +5,7 @@
 macro_rules! create_dynamic_library {
     ($t:ty) => {
         use mosquitto_dev::*;
+        use std::ffi::CString;
         use std::os::raw::c_int;
         use std::os::raw::c_void;
 
