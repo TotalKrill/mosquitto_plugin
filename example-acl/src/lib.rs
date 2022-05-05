@@ -42,14 +42,14 @@ impl MosquittoPlugin for Test {
         let rp: String = p.chars().rev().collect();
         if rp == u {
             // Declare the accepted new client
-            self.broker_broadcast_publish(
+            mosquitto_calls::publish_broadcast(
                 "new_client",
                 "very_client is a friend. Lets make it feel at home!".as_bytes(),
                 QOS::AtMostOnce,
                 false,
             )?;
             // Welcome the new client privately
-            self.broker_publish_to_client(
+            mosquitto_calls::publish_to_client(
                 &client_id,
                 "greeting",
                 format!("Welcome {}", client_id).as_bytes(),
@@ -60,7 +60,7 @@ impl MosquittoPlugin for Test {
         } else {
             println!("USERNAME_PASSWORD failed for {}", client_id);
             // Snitch to all other clients what a bad client that was.
-            self.broker_broadcast_publish(
+            mosquitto_calls::publish_broadcast(
                 "snitcheroo",
                 format!("{} is a bad bad client. No cookies for it.", client_id).as_bytes(),
                 QOS::AtMostOnce,
