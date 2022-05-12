@@ -80,6 +80,7 @@ pub enum AclCheckAccessLevel {
     Read = 1,
     Write = 2,
     Subscribe = 4,
+    Unsubscribe = 8,
 }
 
 impl std::fmt::Display for AclCheckAccessLevel {
@@ -94,6 +95,7 @@ impl Into<Option<AclCheckAccessLevel>> for AccessLevel {
             AccessLevel::Read => Some(AclCheckAccessLevel::Read),
             AccessLevel::Write => Some(AclCheckAccessLevel::Write),
             AccessLevel::Subscribe => Some(AclCheckAccessLevel::Subscribe),
+            AccessLevel::Unsubscribe => Some(AclCheckAccessLevel::Unsubscribe),
             _ => None,
         }
     }
