@@ -26,17 +26,19 @@ pub fn __from_ptr_and_size<'a>(opts: *mut mosquitto_opt, count: usize) -> Mosqui
         // manually increment the pointers according to the coun value
         let opt = unsafe {
             let opt = optsval + i as usize * std::mem::size_of::<mosquitto_opt>();
-            (opt as *mut mosquitto_opt).as_ref().unwrap()
+            (opt as *mut mosquitto_opt)
+                .as_ref()
+                .expect("Failed to extract from ptr and size")
         };
 
         // get a reference, and then use this to parse the values into owned strings
         let key: &str = unsafe {
             let c_str = std::ffi::CStr::from_ptr(opt.key);
-            c_str.to_str().unwrap()
+            c_str.to_str().expect("Failed to create string from CStr")
         };
         let value: &str = unsafe {
             let c_str = std::ffi::CStr::from_ptr(opt.value);
-            c_str.to_str().unwrap()
+            c_str.to_str().expect("Failed to create string from CStr")
         };
         map.insert(key, value);
     }
@@ -211,7 +213,7 @@ pub trait MosquittoClientContext {
     /// Binding to mosquitto_client_clean_session
     fn is_clean_session(&self) -> bool;
     /// Binding to mosquitto_client_id
-    fn get_id(&self) -> String;
+    fn get_id(&self) -> Option<String>;
     /// Binding to mosquitto_client_keepalive
     fn get_keepalive(&self) -> i32;
     /// Binding to mosquitto_client_certificate
@@ -248,14 +250,20 @@ impl MosquittoClientContext for MosquittoClient {
         unsafe { mosquitto_client_clean_session(self.client) }
     }
 
-    fn get_id(&self) -> String {
+    fn get_id(&self) -> Option<String> {
         unsafe {
             let client_id = mosquitto_client_id(self.client);
-            let c_str = std::ffi::CStr::from_ptr(client_id);
-            c_str
-                .to_str()
-                .expect("Couldn't convert CStr to &str")
-                .to_string() // TODO should we avoid expect here and instead return Option<String>?
+
+            if client_id.is_null() {
+                None
+            } else {
+                let c_str = std::ffi::CStr::from_ptr(client_id);
+                let r_string = c_str
+                    .to_str()
+                    .expect("Couldn't convert CStr to &str")
+                    .to_string(); // TODO should we avoid expect here and instead return Option<String>?
+                Some(r_string)
+            }
         }
     }
 

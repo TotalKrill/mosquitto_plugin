@@ -314,17 +314,22 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
-            let user_data: &mut InternalUserData =
-                unsafe { &mut *(user_data as *mut InternalUserData) };
+            let user_data: &mut InternalUserData = unsafe {
+                // println!("Got user data: {:?}", user_data);
+                &mut *(user_data as *mut InternalUserData)
+            };
 
             let event_data: &mut mosquitto_evt_disconnect =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_disconnect) };
-            user_data.external_user_data.on_disconnect(
-                &MosquittoClient {
-                    client: event_data.client,
-                },
-                event_data.reason,
-            );
+
+            let client = MosquittoClient {
+                client: event_data.client,
+            };
+
+            user_data
+                .external_user_data
+                .on_disconnect(&client, event_data.reason);
+
             0
         }
 

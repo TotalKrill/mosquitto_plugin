@@ -1,6 +1,6 @@
 [package]
 name = "mosquitto-plugin"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["Kristoffer Ödmark <kristoffer.odmark90@gmail.com>"]
 edition = "2018"
 readme = "README.md"
