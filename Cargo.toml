@@ -14,4 +14,4 @@ description = "A simple way to create plugins for mosquitto, using rust code"
 libc = "0.2"
 
 [build-dependencies]
-bindgen = "0.58"
+bindgen = { version = "0.59", default-features = false, features = ["runtime"] }
