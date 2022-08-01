@@ -14,6 +14,12 @@ fn main() {
         // The input header we would like to generate
         // bindings for.
         .header("wrapper.h")
+        // Filter functions with mosquitto_.*
+        .allowlist_function("mosquitto_.*")
+        // Filter types with mosquitto_.*
+        .allowlist_type("mosquitto_.*")
+        // Filter variables with MOSQ_.*
+        .allowlist_var("MOSQ_.*")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
