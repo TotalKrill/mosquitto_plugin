@@ -303,7 +303,10 @@ impl MosquittoClientContext for MosquittoClient {
                 3 => MosquittoClientProtocolVersion::V3,
                 4 => MosquittoClientProtocolVersion::V4,
                 5 => MosquittoClientProtocolVersion::V5,
-                _ => panic!("invalid mosquitto client protocol version returned from mosquitto_client_protocol_version. {}", protocol_version)
+                _ => panic!(
+                    "invalid mosquitto client protocol version returned from mosquitto_client_protocol_version. {}",
+                    protocol_version
+                ),
             }
         }
     }
