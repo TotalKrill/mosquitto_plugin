@@ -1,3 +1,5 @@
+[![CI](https://github.com/TotalKrill/mosquitto_plugin/workflows/ci/badge.svg)](https://github.com/TotalKrill/mosquitto_plugin/actions)
+
 # Mosquitto Plugin
 
 A simple way to generate ACL and PASSWORD plugins for usage with the mosquitto

@@ -57,9 +57,9 @@ pub enum AccessLevel {
     Unknown,
 }
 
-impl Into<AccessLevel> for i32 {
-    fn into(self) -> AccessLevel {
-        match self {
+impl From<i32> for AccessLevel {
+    fn from(level: i32) -> AccessLevel {
+        match level {
             0 => AccessLevel::None,
             1 => AccessLevel::Read,
             2 => AccessLevel::Write,
@@ -91,9 +91,9 @@ impl std::fmt::Display for AclCheckAccessLevel {
     }
 }
 
-impl Into<Option<AclCheckAccessLevel>> for AccessLevel {
-    fn into(self) -> Option<AclCheckAccessLevel> {
-        match self {
+impl From<AccessLevel> for Option<AclCheckAccessLevel> {
+    fn from(level: AccessLevel) -> Option<AclCheckAccessLevel> {
+        match level {
             AccessLevel::Read => Some(AclCheckAccessLevel::Read),
             AccessLevel::Write => Some(AclCheckAccessLevel::Write),
             AccessLevel::Subscribe => Some(AclCheckAccessLevel::Subscribe),
@@ -138,17 +138,16 @@ pub enum Error {
     OCSP = 26,
 }
 
-impl Into<i32> for Error {
-    fn into(self) -> i32 {
-        self as i32
+impl From<Error> for i32 {
+    fn from(e: Error) -> i32 {
+        e as i32
     }
 }
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Success;
 
-impl Into<i32> for Success {
-    fn into(self) -> i32 {
+impl From<Success> for i32 {
+    fn from(_: Success) -> i32 {
         0
     }
 }
@@ -304,7 +303,10 @@ impl MosquittoClientContext for MosquittoClient {
                 3 => MosquittoClientProtocolVersion::V3,
                 4 => MosquittoClientProtocolVersion::V4,
                 5 => MosquittoClientProtocolVersion::V5,
-                _ => panic!("invalid mosquitto client protocol version returned from mosquitto_client_protocol_version. {}", protocol_version)
+                _ => panic!(
+                    "invalid mosquitto client protocol version returned from mosquitto_client_protocol_version. {}",
+                    protocol_version
+                ),
             }
         }
     }
