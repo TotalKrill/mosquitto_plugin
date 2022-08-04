@@ -4,6 +4,7 @@ use mosquitto_plugin::*;
 
 // Some simple nonsense structure to use as an example
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Test {
     i: i32,
     s: String,
@@ -31,7 +32,7 @@ impl MosquittoPlugin for Test {
         u: Option<&str>,
         p: Option<&str>,
     ) -> Result<Success, Error> {
-        let client_id = client.get_id();
+        let client_id = client.get_id().unwrap_or("unknown".into());
         println!("USERNAME_PASSWORD({}) {:?} - {:?}", client_id, u, p);
         if u.is_none() || p.is_none() {
             return Err(Error::Auth);
@@ -72,7 +73,7 @@ impl MosquittoPlugin for Test {
 
     fn acl_check(
         &mut self,
-        client: &dyn MosquittoClientContext,
+        _client: &dyn MosquittoClientContext,
         level: AclCheckAccessLevel,
         msg: MosquittoMessage,
     ) -> Result<Success, mosquitto_plugin::Error> {
@@ -90,8 +91,8 @@ impl MosquittoPlugin for Test {
         }
     }
 
-    fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, reason: i32) {
-        println!("Plugin on_disconnect, Client {} is disconnecting", client.get_id());
+    fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, _reason: i32) {
+        println!("Plugin on_disconnect, Client {:?} is disconnecting", client.get_id());
     }
 
     fn on_message(
@@ -99,7 +100,7 @@ impl MosquittoPlugin for Test {
         client: &dyn MosquittoClientContext,
         message: MosquittoMessage,
     ) {
-        println!("Plugin on_message: client {}: Topic: {}, Payload: {:?}", client.get_id(), message.topic, message.payload)
+        println!("Plugin on_message: client {:?}: Topic: {}, Payload: {:?}", client.get_id(), message.topic, message.payload)
     }
 }
 
