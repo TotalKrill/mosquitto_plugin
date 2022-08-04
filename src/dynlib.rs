@@ -140,29 +140,52 @@ macro_rules! create_dynamic_library {
         }
 
         #[no_mangle]
-        extern "C" fn on_auth_start_trampoline(
-            _event: c_int,
-            event_data: *mut c_void,
-            user_data: *mut c_void,
-        ) -> c_int {
-            let user_data: &mut InternalUserData =
-                unsafe { &mut *(user_data as *mut InternalUserData) };
+        extern "C" fn on_auth(event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
+            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_extended_auth =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
-            unimplemented!();
-        }
 
-        #[no_mangle]
-        extern "C" fn on_auth_continue_trampoline(
-            _event: c_int,
-            event_data: *mut c_void,
-            user_data: *mut c_void,
-        ) -> c_int {
-            let user_data: &mut InternalUserData =
-                unsafe { &mut *(user_data as *mut InternalUserData) };
-            let event_data: &mut mosquitto_evt_extended_auth =
-                unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
-            unimplemented!();
+            let method: &str = unsafe {
+                let c_str = std::ffi::CStr::from_ptr(event_data.auth_method);
+                c_str
+                    .to_str()
+                    .expect("auth start trampoline failed to create auth method &str from CStr pointer")
+            };
+
+            let data_in: &[u8] =
+                unsafe { std::slice::from_raw_parts(event_data.data_in as *const u8, event_data.data_in_len as usize) };
+
+            let result = if event == MosquittoPluginEvent::MosqEvtExtAuthStart as _ {
+                user_data.external_user_data.on_auth_start(
+                    &MosquittoClient {
+                        client: event_data.client,
+                    },
+                    method,
+                    data_in,
+                )
+            } else if event == MosquittoPluginEvent::MosqEvtExtAuthContinue as _ {
+                user_data.external_user_data.on_auth_continue(
+                    &MosquittoClient {
+                        client: event_data.client,
+                    },
+                    method,
+                    data_in,
+                )
+            } else {
+                unreachable!("invalid event type");
+            };
+
+            match result {
+                Ok(r) => r.into(),
+                Err(Error::AuthContinue(data_out)) => {
+                    assert!(data_out.len() <= u16::MAX as usize);
+                    event_data.data_out_len = data_out.len() as u16;
+                    event_data.data_out = data_out.as_ptr() as _;
+                    std::mem::forget(data_out);
+                    Error::AuthContinue(Vec::with_capacity(0)).into()
+                }
+                Err(e) => e.into(),
+            }
         }
 
         #[no_mangle]
@@ -378,6 +401,22 @@ macro_rules! create_dynamic_library {
                     identifier as _,
                     MosquittoPluginEvent::MosqEvtBasicAuth as _,
                     Some(on_basic_auth_trampoline),
+                    std::ptr::null(),
+                    instance_rawptr as _,
+                );
+
+                mosquitto_callback_register(
+                    identifier as _,
+                    MosquittoPluginEvent::MosqEvtExtAuthStart as _,
+                    Some(on_auth),
+                    std::ptr::null(),
+                    instance_rawptr as _,
+                );
+
+                mosquitto_callback_register(
+                    identifier as _,
+                    MosquittoPluginEvent::MosqEvtExtAuthContinue as _,
+                    Some(on_auth),
                     std::ptr::null(),
                     instance_rawptr as _,
                 );
