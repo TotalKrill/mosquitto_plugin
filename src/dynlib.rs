@@ -140,20 +140,29 @@ macro_rules! create_dynamic_library {
         }
 
         #[no_mangle]
-        extern "C" fn on_auth(event: c_int, event_data: *mut c_void, user_data: *mut c_void) -> c_int {
-            let user_data: &mut InternalUserData = unsafe { &mut *(user_data as *mut InternalUserData) };
+        extern "C" fn on_auth(
+            event: c_int,
+            event_data: *mut c_void,
+            user_data: *mut c_void,
+        ) -> c_int {
+            let user_data: &mut InternalUserData =
+                unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_extended_auth =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
 
             let method: &str = unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.auth_method);
-                c_str
-                    .to_str()
-                    .expect("auth start trampoline failed to create auth method &str from CStr pointer")
+                c_str.to_str().expect(
+                    "auth start trampoline failed to create auth method &str from CStr pointer",
+                )
             };
 
-            let data_in: &[u8] =
-                unsafe { std::slice::from_raw_parts(event_data.data_in as *const u8, event_data.data_in_len as usize) };
+            let data_in: &[u8] = unsafe {
+                std::slice::from_raw_parts(
+                    event_data.data_in as *const u8,
+                    event_data.data_in_len as usize,
+                )
+            };
 
             let result = if event == MosquittoPluginEvent::MosqEvtExtAuthStart as _ {
                 user_data.external_user_data.on_auth_start(

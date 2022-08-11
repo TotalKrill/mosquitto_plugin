@@ -8,6 +8,9 @@ license = "MIT"
 repository = "https://github.com/TotalKrill/mosquitto_plugin.git"
 description = "A simple way to create plugins for mosquitto, using rust code"
 
+[[example]]
+name = "acl"
+crate-type = ["cdylib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]

@@ -25,4 +25,22 @@ The optional functions are not implemented here.
 
 ## Example usage
 
-There is an example usage in the github repo under "example-acl" folder.
+There is an example usage in the github repo under "examples/acl" folder.
+
+### ACL
+
+Simple example that allows only password/username combos where the password is
+reversed (and no credentials as well, since those do not invoke ACL calls, and
+thus needs to be configured in a mosquitto configuration)
+
+It also only allows messages on the topic specified in the mosquitto config as
+auth_opt_topic
+
+See the provided examples/mosquitto-acl.conf for details.
+
+Start build and run:
+
+```
+cargo build --example acl
+mosquitto -c examples/acl.conf
+```
