@@ -10,7 +10,10 @@ fn main() {
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=wrapper.h");
     // Tell cargo to invalidate the built crate whenever the extra args variable changes
-    println!("cargo:rerun-if-env-changed={}", MOSQUITTO_PLUGIN_CLANG_EXTRA_ARGS);
+    println!(
+        "cargo:rerun-if-env-changed={}",
+        MOSQUITTO_PLUGIN_CLANG_EXTRA_ARGS
+    );
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
