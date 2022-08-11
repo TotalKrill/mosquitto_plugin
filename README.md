@@ -44,3 +44,14 @@ Start build and run:
 cargo build --example acl
 mosquitto -c examples/acl.conf
 ```
+
+### AUTH
+
+Example how to negotiate authentification with a client with v5 AUTH packages.
+
+Start build and run:
+
+```
+cargo build --example auth
+mosquitto -c examples/auth.conf
+```

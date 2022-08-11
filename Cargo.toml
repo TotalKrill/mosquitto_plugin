@@ -12,7 +12,10 @@ description = "A simple way to create plugins for mosquitto, using rust code"
 name = "acl"
 crate-type = ["cdylib"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[example]]
+name = "auth"
+crate-type = ["cdylib"]
+
 [dependencies]
 libc = "0.2"
 
