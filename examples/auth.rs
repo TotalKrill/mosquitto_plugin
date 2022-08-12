@@ -3,9 +3,16 @@
 use mosquitto_plugin::*;
 use std::collections::{HashMap, HashSet};
 
+/// Random auth data that is expected from the client.
+const HELLO_BROKER: &str = "hello broker";
+/// Random auth data that is sent from the broker to the client.
+const HELLO_CLIENT: &str = "hello client";
+
+/// Example plugin for extended auth.
 #[derive(Debug, Default)]
 #[allow(dead_code)]
 pub struct AuthPlugin {
+    /// Set of "authenticated" client ids.
     authenticated: HashSet<String>,
 }
 
@@ -49,14 +56,14 @@ impl MosquittoPlugin for AuthPlugin {
         method: Option<&str>,
         data: Option<&[u8]>,
     ) -> Result<Success, Error> {
-        let client_id = client.get_id().ok_or(Error::Inval)?;
-
         println!(
-            "Plugin on_auth_start, Client {} with method {:?} and data {:?}",
-            client_id, method, data
+            "Plugin on_auth_start, Client {:?} with method {:?} and data {:?}",
+            client.get_id(),
+            method,
+            data
         );
         // Sending random auth data "hello"
-        Err(Error::AuthContinue(b"hello".to_vec()))
+        Err(Error::AuthContinue(HELLO_CLIENT.as_bytes().to_vec()))
     }
 
     /// Authentication continue.
@@ -72,9 +79,9 @@ impl MosquittoPlugin for AuthPlugin {
             client_id, method, data
         );
 
-        // If client replies with hello we're fine - otherwise greet again.
+        // If client replies with "hello broker" we're fine - otherwise greet again.
         if let Some(data) = data {
-            if data == b"hello" {
+            if data == HELLO_BROKER.as_bytes() {
                 println!(
                     "Plugin on_auth_continue, Client {} authenticated",
                     client_id
@@ -86,10 +93,10 @@ impl MosquittoPlugin for AuthPlugin {
                     "Plugin on_auth_continue, Client {} failed to authenticate. Expected \"hello\"",
                     client_id
                 );
-                Err(Error::AuthContinue(b"hello again".to_vec()))
+                Err(Error::AuthContinue(HELLO_CLIENT.as_bytes().to_vec()))
             }
         } else {
-            Err(Error::AuthContinue(b"hello again".to_vec()))
+            Err(Error::AuthContinue(HELLO_CLIENT.as_bytes().to_vec()))
         }
     }
 }

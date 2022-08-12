@@ -47,7 +47,7 @@ pub fn __from_ptr_and_size<'a>(opts: *mut mosquitto_opt, count: usize) -> Mosqui
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AccessLevel {
     None = 0,
     Read = 1,
