@@ -443,8 +443,8 @@ pub trait MosquittoPlugin {
     fn on_auth_start(
         &mut self,
         _client: &dyn MosquittoClientContext,
-        _method: &str,
-        _data: &[u8],
+        _method: Option<&str>,
+        _data: Option<&[u8]>,
     ) -> Result<Success, Error> {
         Ok(Success)
     }
@@ -454,8 +454,8 @@ pub trait MosquittoPlugin {
     fn on_auth_continue(
         &mut self,
         _client: &dyn MosquittoClientContext,
-        _method: &str,
-        _data: &[u8],
+        _method: Option<&str>,
+        _data: Option<&[u8]>,
     ) -> Result<Success, Error> {
         Ok(Success)
     }

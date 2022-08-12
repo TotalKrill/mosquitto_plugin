@@ -150,19 +150,19 @@ macro_rules! create_dynamic_library {
             let event_data: &mut mosquitto_evt_extended_auth =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_extended_auth) };
 
-            let method: &str = unsafe {
+            let method = (!event_data.auth_method.is_null()).then(|| unsafe {
                 let c_str = std::ffi::CStr::from_ptr(event_data.auth_method);
                 c_str.to_str().expect(
                     "auth start trampoline failed to create auth method &str from CStr pointer",
                 )
-            };
+            });
 
-            let data_in: &[u8] = unsafe {
+            let data_in = (!event_data.data_in.is_null()).then(|| unsafe {
                 std::slice::from_raw_parts(
                     event_data.data_in as *const u8,
                     event_data.data_in_len as usize,
                 )
-            };
+            });
 
             let result = if event == MosquittoPluginEvent::MosqEvtExtAuthStart as _ {
                 user_data.external_user_data.on_auth_start(

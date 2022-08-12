@@ -46,13 +46,13 @@ impl MosquittoPlugin for AuthPlugin {
     fn on_auth_start(
         &mut self,
         client: &dyn MosquittoClientContext,
-        method: &str,
-        data: &[u8],
+        method: Option<&str>,
+        data: Option<&[u8]>,
     ) -> Result<Success, Error> {
         let client_id = client.get_id().ok_or(Error::Inval)?;
 
         println!(
-            "Plugin on_auth_start, Client {} with method {} and data {:?}",
+            "Plugin on_auth_start, Client {} with method {:?} and data {:?}",
             client_id, method, data
         );
         // Sending random auth data "hello"
@@ -63,18 +63,31 @@ impl MosquittoPlugin for AuthPlugin {
     fn on_auth_continue(
         &mut self,
         client: &dyn MosquittoClientContext,
-        method: &str,
-        data: &[u8],
+        method: Option<&str>,
+        data: Option<&[u8]>,
     ) -> Result<Success, Error> {
         let client_id = client.get_id().ok_or(Error::Inval)?;
         println!(
-            "Plugin on_auth_continue, Client {} with method {} and data {:?}",
+            "Plugin on_auth_continue, Client {} with method {:?} and data {:?}",
             client_id, method, data
         );
 
         // If client replies with hello we're fine - otherwise greet again.
-        if data == b"hello" {
-            Ok(Success)
+        if let Some(data) = data {
+            if data == b"hello" {
+                println!(
+                    "Plugin on_auth_continue, Client {} authenticated",
+                    client_id
+                );
+                self.authenticated.insert(client_id.into());
+                Ok(Success)
+            } else {
+                println!(
+                    "Plugin on_auth_continue, Client {} failed to authenticate. Expected \"hello\"",
+                    client_id
+                );
+                Err(Error::AuthContinue(b"hello again".to_vec()))
+            }
         } else {
             Err(Error::AuthContinue(b"hello again".to_vec()))
         }
