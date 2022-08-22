@@ -1,3 +1,5 @@
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 // Has to be included, to get the errors and success parameters that are used in the
 // generate_dynamic_library macro invocation
 use mosquitto_plugin::*;
@@ -32,7 +34,7 @@ impl MosquittoPlugin for Test {
         u: Option<&str>,
         p: Option<&str>,
     ) -> Result<Success, Error> {
-        let client_id = client.get_id().unwrap_or("unknown".into());
+        let client_id = client.get_id().unwrap_or_else(|| "unknown".into());
         println!("USERNAME_PASSWORD({}) {:?} - {:?}", client_id, u, p);
         if u.is_none() || p.is_none() {
             return Err(Error::Auth);
@@ -92,15 +94,19 @@ impl MosquittoPlugin for Test {
     }
 
     fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, _reason: i32) {
-        println!("Plugin on_disconnect, Client {:?} is disconnecting", client.get_id());
+        println!(
+            "Plugin on_disconnect, Client {:?} is disconnecting",
+            client.get_id()
+        );
     }
 
-    fn on_message(
-        &mut self,
-        client: &dyn MosquittoClientContext,
-        message: MosquittoMessage,
-    ) {
-        println!("Plugin on_message: client {:?}: Topic: {}, Payload: {:?}", client.get_id(), message.topic, message.payload)
+    fn on_message(&mut self, client: &dyn MosquittoClientContext, message: MosquittoMessage) {
+        println!(
+            "Plugin on_message: client {:?}: Topic: {}, Payload: {:?}",
+            client.get_id(),
+            message.topic,
+            message.payload
+        )
     }
 }
 

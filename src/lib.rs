@@ -47,7 +47,7 @@ pub fn __from_ptr_and_size<'a>(opts: *mut mosquitto_opt, count: usize) -> Mosqui
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AccessLevel {
     None = 0,
     Read = 1,
@@ -104,43 +104,74 @@ impl From<AccessLevel> for Option<AclCheckAccessLevel> {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    AuthContinue = -4,
-    NoSubscriber = -3,
-    SubExists = -2,
-    ConnPending = -1,
-    NoMem = 1,
-    Protocol = 2,
-    Inval = 3,
-    NoConn = 4,
-    ConnRefused = 5,
-    NotFound = 6,
-    ConnLost = 7,
-    Tls = 8,
-    PayloadSize = 9,
-    NotSupported = 10,
-    Auth = 11,
-    AclDenied = 12,
-    Unknown = 13,
-    Errno = 14,
-    Eai = 15,
-    Proxy = 16,
-    PluginDefer = 17,
-    MalformedUtf8 = 18,
-    Keepalive = 19,
-    Lookup = 20,
-    MalformedPacket = 21,
-    DuplicateProperty = 22,
-    TlsHandshake = 23,
-    QosNotSupported = 24,
-    OversizePacket = 25,
-    OCSP = 26,
+    AuthContinue(Vec<u8>),
+    NoSubscriber,
+    SubExists,
+    ConnPending,
+    NoMem,
+    Protocol,
+    Inval,
+    NoConn,
+    ConnRefused,
+    NotFound,
+    ConnLost,
+    Tls,
+    PayloadSize,
+    NotSupported,
+    Auth,
+    AclDenied,
+    Unknown,
+    Errno,
+    Eai,
+    Proxy,
+    PluginDefer,
+    MalformedUtf8,
+    Keepalive,
+    Lookup,
+    MalformedPacket,
+    DuplicateProperty,
+    TlsHandshake,
+    QosNotSupported,
+    OversizePacket,
+    OCSP,
 }
 
 impl From<Error> for i32 {
     fn from(e: Error) -> i32 {
-        e as i32
+        match e {
+            Error::AuthContinue(_) => -4,
+            Error::NoSubscriber => -3,
+            Error::SubExists => -2,
+            Error::ConnPending => -1,
+            Error::NoMem => 1,
+            Error::Protocol => 2,
+            Error::Inval => 3,
+            Error::NoConn => 4,
+            Error::ConnRefused => 5,
+            Error::NotFound => 6,
+            Error::ConnLost => 7,
+            Error::Tls => 8,
+            Error::PayloadSize => 9,
+            Error::NotSupported => 10,
+            Error::Auth => 11,
+            Error::AclDenied => 12,
+            Error::Unknown => 13,
+            Error::Errno => 14,
+            Error::Eai => 15,
+            Error::Proxy => 16,
+            Error::PluginDefer => 17,
+            Error::MalformedUtf8 => 18,
+            Error::Keepalive => 19,
+            Error::Lookup => 20,
+            Error::MalformedPacket => 21,
+            Error::DuplicateProperty => 22,
+            Error::TlsHandshake => 23,
+            Error::QosNotSupported => 24,
+            Error::OversizePacket => 25,
+            Error::OCSP => 26,
+        }
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -403,6 +434,28 @@ pub trait MosquittoPlugin {
         client: &dyn MosquittoClientContext,
         username: Option<&str>,
         password: Option<&str>,
+    ) -> Result<Success, Error> {
+        Ok(Success)
+    }
+
+    /// Authentication start. Default implementation always returns success. Return Err(Error::AuthContinue(_))
+    /// to send auth data to the client.
+    fn on_auth_start(
+        &mut self,
+        _client: &dyn MosquittoClientContext,
+        _method: Option<&str>,
+        _data: Option<&[u8]>,
+    ) -> Result<Success, Error> {
+        Ok(Success)
+    }
+
+    /// Authentication continue. Default implementation always returns success. Return `Err(Error::AuthContinue(_))`
+    /// to send auth data to the client or `Ok(Success)`.
+    fn on_auth_continue(
+        &mut self,
+        _client: &dyn MosquittoClientContext,
+        _method: Option<&str>,
+        _data: Option<&[u8]>,
     ) -> Result<Success, Error> {
         Ok(Success)
     }
