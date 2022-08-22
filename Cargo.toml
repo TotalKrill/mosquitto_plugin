@@ -9,11 +9,11 @@ repository = "https://github.com/TotalKrill/mosquitto_plugin.git"
 description = "A simple way to create plugins for mosquitto, using rust code"
 
 [[example]]
-name = "acl"
+name = "basic-auth"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "auth"
+name = "extended-auth"
 crate-type = ["cdylib"]
 
 [dependencies]

@@ -27,7 +27,7 @@ The optional functions are not implemented here.
 
 There is an example usage in the github repo under "examples/acl" folder.
 
-### ACL
+### Basic authentification
 
 Simple example that allows only password/username combos where the password is
 reversed (and no credentials as well, since those do not invoke ACL calls, and
@@ -41,17 +41,17 @@ See the provided examples/mosquitto-acl.conf for details.
 Start build and run:
 
 ```
-cargo build --example acl
-mosquitto -c examples/acl.conf
+cargo build --example basic-auth
+mosquitto -c examples/basic-auth.conf
 ```
 
-### AUTH
+### Extended authentification
 
 Example how to negotiate authentification with a client with v5 AUTH packages.
 
 Start build and run:
 
 ```
-cargo build --example auth
-mosquitto -c examples/auth.conf
+cargo build --example extended-auth
+mosquitto -c examples/extended-auth.conf
 ```
