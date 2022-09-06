@@ -1,13 +1,42 @@
 // This generates the dynamic c bindings functions that are exported and usable by mosquitto, as
 // well as allocating memory for the structure and handles recreating this from raw memory, to
 // allow the generated plugin to use member functions, and thus have mutable state
+
+// if segfaulting, compiling in debug mode, will enable asserts of most ptrs
+
 #[macro_export]
 macro_rules! create_dynamic_library {
     ($t:ty) => {
+        macro_rules! debug_assert_null_or_str {
+            ($ptr:expr, $l:literal) => {
+                unsafe {
+                    debug_assert!(!$ptr.is_null(), "ptr is null!");
+                    let c_str = std::ffi::CStr::from_ptr($ptr);
+                    c_str.to_str().expect($l)
+                }
+            };
+        }
+
+        macro_rules! debug_assert_null_or_slice {
+            ($data:expr, $datalen:expr, $l:literal) => {
+                unsafe {
+                    let event_data = $data as *const u8;
+                    if event_data.is_null() {
+                        PAYLOAD_NULL
+                    } else {
+                        debug_assert!(!event_data.is_null(), $l);
+                        std::slice::from_raw_parts(event_data, $datalen as usize)
+                    }
+                }
+            };
+        }
+
         use mosquitto_dev::*;
         use std::ffi::CString;
         use std::os::raw::c_int;
         use std::os::raw::c_void;
+
+        const PAYLOAD_NULL: &[u8] = &[];
 
         fn __assert_sync()
         where
@@ -37,6 +66,14 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_reload_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on_reload_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_reload =
@@ -52,6 +89,14 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_acl_check_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on_acl_check_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_acl_check =
@@ -64,19 +109,16 @@ macro_rules! create_dynamic_library {
                 return Error::Unknown.into();
             };
 
-            let topic: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(event_data.topic);
-                c_str
-                    .to_str()
-                    .expect("Acl trampoline, failed to create &str from CStr pointer")
-            };
+            let topic: &str = debug_assert_null_or_str!(
+                event_data.topic,
+                "failed to create topic str on acl check trampoline"
+            );
 
-            let payload: &[u8] = unsafe {
-                std::slice::from_raw_parts(
-                    event_data.payload as *const u8,
-                    event_data.payloadlen as usize,
-                )
-            };
+            let payload: &[u8] = debug_assert_null_or_slice!(
+                event_data.payload,
+                event_data.payloadlen,
+                "acl_check_trampoline payload is null"
+            );
 
             let msg = MosquittoMessage {
                 topic,
@@ -102,10 +144,19 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_basic_auth_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on_basic_auth_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_basic_auth =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_basic_auth) };
+
             let username: Option<&str> = unsafe {
                 if event_data.username.is_null() {
                     None
@@ -127,6 +178,11 @@ macro_rules! create_dynamic_library {
                 }
             };
 
+            debug_assert!(
+                !event_data.client.is_null(),
+                "no client in basic auth trampoline"
+            );
+
             match user_data.external_user_data.username_password(
                 &MosquittoClient {
                     client: event_data.client,
@@ -145,6 +201,8 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(!event_data.is_null(), "on_auth event_data is null");
+            debug_assert!(!user_data.is_null(), "on_auth user_data is null");
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_extended_auth =
@@ -164,7 +222,7 @@ macro_rules! create_dynamic_library {
                 )
             });
 
-            let result = if event == MosquittoPluginEvent::MosqEvtExtAuthStart as _ {
+            let result = if event == MosquittoPluginEvent::MosqEvtExtAuthStart as c_int {
                 user_data.external_user_data.on_auth_start(
                     &MosquittoClient {
                         client: event_data.client,
@@ -172,7 +230,7 @@ macro_rules! create_dynamic_library {
                     method,
                     data_in,
                 )
-            } else if event == MosquittoPluginEvent::MosqEvtExtAuthContinue as _ {
+            } else if event == MosquittoPluginEvent::MosqEvtExtAuthContinue as c_int {
                 user_data.external_user_data.on_auth_continue(
                     &MosquittoClient {
                         client: event_data.client,
@@ -187,7 +245,7 @@ macro_rules! create_dynamic_library {
             match result {
                 Ok(r) => r.into(),
                 Err(Error::AuthContinue(data_out)) => {
-                    assert!(data_out.len() <= u16::MAX as usize);
+                    debug_assert!(data_out.len() <= u16::MAX as usize);
                     event_data.data_out_len = data_out.len() as u16;
                     event_data.data_out = data_out.as_ptr() as _;
                     std::mem::forget(data_out);
@@ -203,23 +261,29 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_control_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on_control_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_control =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_control) };
-            let topic: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(event_data.topic);
-                c_str
-                    .to_str()
-                    .expect("control trampoline failed to create topic &str from CStr pointer")
-            };
 
-            let payload: &[u8] = unsafe {
-                std::slice::from_raw_parts(
-                    event_data.payload as *const u8,
-                    event_data.payloadlen as usize,
-                )
-            };
+            let topic: &str = debug_assert_null_or_str!(
+                event_data.topic,
+                "control trampoline failed to create topic &str from CStr pointer"
+            );
+
+            let payload: &[u8] = debug_assert_null_or_slice!(
+                event_data.payload,
+                event_data.payloadlen,
+                "on_control_trampoline payload is null"
+            );
 
             let msg = MosquittoMessage {
                 topic,
@@ -243,23 +307,29 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_message_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on_message_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_message =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_message) };
-            let topic: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(event_data.topic);
-                c_str
-                    .to_str()
-                    .expect("message trampoline failed to create topic &str from CStr pointer")
-            };
 
-            let payload: &[u8] = unsafe {
-                std::slice::from_raw_parts(
-                    event_data.payload as *const u8,
-                    event_data.payloadlen as usize,
-                )
-            };
+            let topic: &str = debug_assert_null_or_str!(
+                event_data.topic,
+                "message trampoline failed to create topic &str from CStr pointer"
+            );
+
+            let payload: &[u8] = debug_assert_null_or_slice!(
+                event_data.payload,
+                event_data.payloadlen,
+                "on_message_trampoline_is_null"
+            );
 
             let msg = MosquittoMessage {
                 topic,
@@ -283,31 +353,33 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_psk_key_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on_psk_key_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_psk_key =
                 unsafe { &mut *(event_data as *mut mosquitto_evt_psk_key) };
 
-            let hint: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(event_data.hint);
-                c_str
-                    .to_str()
-                    .expect("psk key trampoline failed to create hint &str from CStr pointer")
-            };
+            let hint: &str = debug_assert_null_or_str!(
+                event_data.hint,
+                "psk key trampoline failed to create hint &str from CStr pointer"
+            );
 
-            let identity: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(event_data.identity);
-                c_str
-                    .to_str()
-                    .expect("psk key trampoline failed to create identity &str from CStr pointer")
-            };
+            let identity: &str = debug_assert_null_or_str!(
+                event_data.identity,
+                "psk key trampoline failed to create identity &str from CStr pointer"
+            );
 
-            let key: &str = unsafe {
-                let c_str = std::ffi::CStr::from_ptr(event_data.key);
-                c_str
-                    .to_str()
-                    .expect("psk key trampoline failed to create key &str from CStr pointer")
-            };
+            let key: &str = debug_assert_null_or_str!(
+                event_data.key,
+                "psk key trampoline failed to create key &str from CStr pointer"
+            );
 
             user_data.external_user_data.on_psk(
                 &MosquittoClient {
@@ -326,6 +398,11 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on_tick_trampoline event_data is null"
+            );
+            debug_assert!(!user_data.is_null(), "on_tick_trampoline user_data is null");
             let user_data: &mut InternalUserData =
                 unsafe { &mut *(user_data as *mut InternalUserData) };
             let event_data: &mut mosquitto_evt_tick =
@@ -346,6 +423,14 @@ macro_rules! create_dynamic_library {
             event_data: *mut c_void,
             user_data: *mut c_void,
         ) -> c_int {
+            debug_assert!(
+                !event_data.is_null(),
+                "on disconnect_trampoline event_data is null"
+            );
+            debug_assert!(
+                !user_data.is_null(),
+                "on disconnect_trampoline user_data is null"
+            );
             let user_data: &mut InternalUserData = unsafe {
                 // println!("Got user data: {:?}", user_data);
                 &mut *(user_data as *mut InternalUserData)
@@ -499,8 +584,15 @@ macro_rules! create_dynamic_library {
                     std::ptr::null(),
                 );
             }
-            println!("plugincleanup 2");
-
+            if !user_data.identifier.is_null() {
+                let identifier = unsafe {
+                    let c_str = std::ffi::CStr::from_ptr(user_data.identifier as _);
+                    c_str
+                        .to_str()
+                        .expect("plugin identifier is null at cleanup")
+                };
+                println!("cleaning up plugin: {}", identifier);
+            }
             drop(unsafe { Box::from_raw(user_data as *mut InternalUserData) });
 
             Success.into()

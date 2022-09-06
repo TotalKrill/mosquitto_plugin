@@ -15,6 +15,16 @@ mosquitto headers: "-I ../mosquitto-2.0.4/include".
 
 The optional functions are not implemented here.
 
+## Debugging Segfaults
+
+being a plugin utilizing the C ABI interface of mosquitto, there might be segfaults 
+due to unexpected behaviour  in how  mosquitto calls into the plugin, compiling in 
+debug mode will enable asserts of most raw pointer usage and can help in debugging 
+such cases.
+
+Otherwise, look at unsafe code, thats where segfaults occur. Which leaves the entire
+mosquitto codebase, but mosquitto is quite well tested by now. So start looking in this code
+
 ## Supported
 
     - ease of access to write own mosquitto plugins

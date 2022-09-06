@@ -239,7 +239,10 @@ pub enum MosquittoClientProtocolVersion {
 
 pub trait MosquittoClientContext {
     /// Binding to mosquitto_client_address
-    fn get_address(&self) -> std::net::IpAddr;
+
+    /// NOTE: stored sessions might be disconnected upon a restart, and then the client being
+    /// disconnected will have no IP address, the address will then be of type None
+    fn get_address(&self) -> Option<std::net::IpAddr>;
     /// Binding to mosquitto_client_clean_session
     fn is_clean_session(&self) -> bool;
     /// Binding to mosquitto_client_id
@@ -267,20 +270,30 @@ pub struct MosquittoClient {
 }
 
 impl MosquittoClientContext for MosquittoClient {
-    fn get_address(&self) -> IpAddr {
+    fn get_address(&self) -> Option<IpAddr> {
         unsafe {
+            debug_assert!(!self.client.is_null(), "get_address: self client is null");
             let address = mosquitto_client_address(self.client);
-            let c_str = std::ffi::CStr::from_ptr(address);
-            let str = c_str.to_str().expect("Couldn't convert CStr to &str"); // TODO should we avoid expect here and instead return Option<String>?
-            IpAddr::from_str(str).expect("Couldn't parse ip")
+            if address.is_null() {
+                None
+            } else {
+                let c_str = std::ffi::CStr::from_ptr(address);
+                let str = c_str.to_str().expect("Couldn't convert CStr to &str"); // TODO should we avoid expect here and instead return Option<String>?
+                Some(IpAddr::from_str(str).expect("Couldn't parse ip"))
+            }
         }
     }
 
     fn is_clean_session(&self) -> bool {
+        debug_assert!(
+            !self.client.is_null(),
+            "is_clean_session: self client is null"
+        );
         unsafe { mosquitto_client_clean_session(self.client) }
     }
 
     fn get_id(&self) -> Option<String> {
+        debug_assert!(!self.client.is_null(), "get_id: self client is null");
         unsafe {
             let client_id = mosquitto_client_id(self.client);
 
@@ -298,6 +311,7 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn get_keepalive(&self) -> i32 {
+        debug_assert!(!self.client.is_null(), "get_keepalive: self client is null");
         unsafe { mosquitto_client_keepalive(self.client) }
     }
 
@@ -306,6 +320,7 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn get_protocol(&self) -> MosquittoClientProtocol {
+        debug_assert!(!self.client.is_null(), "get_protocol: self client is null");
         unsafe {
             let protocol = mosquitto_client_protocol(self.client) as u32;
             if protocol == mosquitto_protocol_mp_mqtt {
@@ -328,6 +343,10 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn get_protocol_version(&self) -> MosquittoClientProtocolVersion {
+        debug_assert!(
+            !self.client.is_null(),
+            "get_protocol_version: self client is null"
+        );
         unsafe {
             let protocol_version = mosquitto_client_protocol_version(self.client);
             match protocol_version {
@@ -343,10 +362,12 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn get_sub_count(&self) -> i32 {
+        debug_assert!(!self.client.is_null(), "get_sub_count: self client is null");
         unsafe { mosquitto_client_sub_count(self.client) as i32 }
     }
 
     fn get_username(&self) -> String {
+        debug_assert!(!self.client.is_null(), "get_username: self client is null");
         unsafe {
             let username = mosquitto_client_username(self.client);
             let c_str = std::ffi::CStr::from_ptr(username);
@@ -358,6 +379,7 @@ impl MosquittoClientContext for MosquittoClient {
     }
 
     fn set_username(&self, username: String) -> Result<Success, Error> {
+        debug_assert!(!self.client.is_null(), "set_username: self client is null");
         unsafe {
             let c_string = &CString::new(username).expect("no cstring for u");
             let res = mosquitto_set_username(self.client, c_string.as_c_str().as_ptr());
@@ -561,6 +583,6 @@ pub trait MosquittoPlugin {
 mod tests {
     #[test]
     fn it_works() {
-        assert_eq!(2 + 2, 4);
+        debug_assert_eq!(2 + 2, 4);
     }
 }
