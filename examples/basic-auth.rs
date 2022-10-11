@@ -35,7 +35,7 @@ impl MosquittoPlugin for Test {
         p: Option<&str>,
     ) -> Result<Success, Error> {
         let client_id = client.get_id().unwrap_or_else(|| "unknown".into());
-        println!("USERNAME_PASSWORD({}) {:?} - {:?}", client_id, u, p);
+        mosquitto_debug!("USERNAME_PASSWORD({}) {:?} - {:?}", client_id, u, p);
         if u.is_none() || p.is_none() {
             return Err(Error::Auth);
         }
@@ -61,7 +61,7 @@ impl MosquittoPlugin for Test {
             )?;
             Ok(Success)
         } else {
-            println!("USERNAME_PASSWORD failed for {}", client_id);
+            mosquitto_warn!("USERNAME_PASSWORD failed for {}", client_id);
             // Snitch to all other clients what a bad client that was.
             mosquitto_calls::publish_broadcast(
                 "snitcheroo",
@@ -79,9 +79,9 @@ impl MosquittoPlugin for Test {
         level: AclCheckAccessLevel,
         msg: MosquittoMessage,
     ) -> Result<Success, mosquitto_plugin::Error> {
-        println!("allowed topic: {}", self.s);
-        println!("topic: {}", msg.topic);
-        println!("level requested: {}", level);
+        mosquitto_debug!("allowed topic: {}", self.s);
+        mosquitto_debug!("topic: {}", msg.topic);
+        mosquitto_debug!("level requested: {}", level);
 
         // only the topic provided in the mosquitto.conf by the value auth_opt_topic <value> is
         // allowed, errors will not be reported to the clients though, they will only not be able
@@ -94,14 +94,14 @@ impl MosquittoPlugin for Test {
     }
 
     fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, _reason: i32) {
-        println!(
+        mosquitto_info!(
             "Plugin on_disconnect, Client {:?} is disconnecting",
             client.get_id()
         );
     }
 
     fn on_message(&mut self, client: &dyn MosquittoClientContext, message: MosquittoMessage) {
-        println!(
+        mosquitto_info!(
             "Plugin on_message: client {:?}: Topic: {}, Payload: {:?}",
             client.get_id(),
             message.topic,

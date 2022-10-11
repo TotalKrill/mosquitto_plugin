@@ -20,7 +20,7 @@ impl MosquittoPlugin for AuthPlugin {
     }
 
     fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, _reason: i32) {
-        println!(
+        mosquitto_info!(
             "Plugin on_disconnect, Client {:?} is disconnecting",
             client.get_id()
         );
@@ -33,7 +33,7 @@ impl MosquittoPlugin for AuthPlugin {
         method: Option<&str>,
         data: Option<&[u8]>,
     ) -> Result<Success, Error> {
-        println!(
+        mosquitto_info!(
             "Plugin on_auth_start, Client {:?} with method {:?} and data {:?}",
             client.get_id(),
             method,
@@ -51,23 +51,26 @@ impl MosquittoPlugin for AuthPlugin {
         data: Option<&[u8]>,
     ) -> Result<Success, Error> {
         let client_id = client.get_id().ok_or(Error::Inval)?;
-        println!(
+        mosquitto_info!(
             "Plugin on_auth_continue, Client {} with method {:?} and data {:?}",
-            client_id, method, data
+            client_id,
+            method,
+            data
         );
 
         // If client replies with "hello broker" we're fine - otherwise greet again.
         if let Some(data) = data {
             if data == HELLO_BROKER.as_bytes() {
-                println!(
+                mosquitto_info!(
                     "Plugin on_auth_continue, Client {} authenticated",
                     client_id
                 );
                 Ok(Success)
             } else {
-                println!(
+                mosquitto_warn!(
                     "Plugin on_auth_continue, Client {} failed to authenticate. Expected \"{}\"",
-                    client_id, HELLO_BROKER,
+                    client_id,
+                    HELLO_BROKER,
                 );
                 Err(Error::AuthContinue(HELLO_CLIENT.as_bytes().to_vec()))
             }
