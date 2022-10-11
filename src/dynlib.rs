@@ -105,7 +105,7 @@ macro_rules! create_dynamic_library {
             let access_level = if let Some(level) = access_level.into() {
                 level
             } else {
-                println!("Unexpected access level for acl check. {:?}", access_level);
+                mosquitto_warn!("Unexpected access level for acl check. {:?}", access_level);
                 return Error::Unknown.into();
             };
 
@@ -432,7 +432,7 @@ macro_rules! create_dynamic_library {
                 "on disconnect_trampoline user_data is null"
             );
             let user_data: &mut InternalUserData = unsafe {
-                // println!("Got user data: {:?}", user_data);
+                // mosquitto_debug!("Got user data: {:?}", user_data);
                 &mut *(user_data as *mut InternalUserData)
             };
 
@@ -458,11 +458,11 @@ macro_rules! create_dynamic_library {
             opt_count: c_int,
         ) -> c_int {
             let opts = __from_ptr_and_size(opts, opt_count as _);
-            println!("mosquitto_plugin_init {:?}", opts);
+            mosquitto_debug!("mosquitto_plugin_init {:?}", opts);
 
             let instance: $t = <$t>::init(opts);
             let instance = instance;
-            println!("external_user_data addr {:?}", instance);
+            mosquitto_debug!("external_user_data addr {:?}", instance);
             let internal_user_data = InternalUserData {
                 identifier,
                 external_user_data: instance,
@@ -591,7 +591,7 @@ macro_rules! create_dynamic_library {
                         .to_str()
                         .expect("plugin identifier is null at cleanup")
                 };
-                println!("cleaning up plugin: {}", identifier);
+                mosquitto_debug!("cleaning up plugin: {}", identifier);
             }
             drop(unsafe { Box::from_raw(user_data as *mut InternalUserData) });
 

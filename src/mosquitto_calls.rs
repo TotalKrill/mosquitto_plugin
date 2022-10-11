@@ -1,4 +1,4 @@
-use crate::mosquitto_dev::*;
+use crate::mosquitto_dev::{mosquitto_broker_publish, mosquitto_log_printf, mosquitto_property};
 use crate::Error;
 use crate::{Success, QOS};
 use libc::c_void;
@@ -95,4 +95,123 @@ pub fn publish_to_client(
             _default => Err(Error::Unknown),
         }
     }
+}
+
+/// Mosquitto log level.
+#[repr(C)]
+pub enum LogLevel {
+    /// The "info" level.
+    ///
+    /// Designates useful information.
+    Info = 1 << 0,
+    /// The "notice" level.
+    ///
+    /// Designates medium priority information.
+    Notice = 1 << 1,
+    /// The "warning" level.
+    ///
+    /// Designates hazardous situations.
+    Warning = 1 << 2,
+    /// The "error" level.
+    ///
+    /// Designates very serious errors.
+    Err = 1 << 3,
+    /// The "debug" level.
+    ///
+    /// Designates lower priority information.
+    Debug = 1 << 4,
+}
+
+/// Send a log message on `level` to the mosquitto logging subsystem.
+pub fn mosquitto_log(level: LogLevel, message: &str) {
+    let message = CString::new(message).expect("invalid log message: contains a nul byte");
+    unsafe { mosquitto_log_printf(level as i32, message.as_ptr()) }
+}
+/// Logs a message at the debug level into the mosquitto logging subsystem.
+///
+/// # Examples
+///
+/// ```no_run
+/// use mosquitto_plugin::mosquitto_debug;
+///
+/// # fn main() {
+/// let client_id = "unknown";
+/// mosquitto_debug!("Authenticating client id {}", client_id);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! mosquitto_debug {
+    // mosquitto_debug!("a {} event", "log")
+    ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Debug, &format!($($arg)+)))
+}
+
+/// Logs a message at the info level into the mosquitto logging subsystem.
+///
+/// # Examples
+///
+/// ```no_run
+/// use mosquitto_plugin::mosquitto_info;
+///
+/// # fn main() {
+/// let client_id = "unknown";
+/// mosquitto_info!("Authentication of client id {} successful", client_id);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! mosquitto_info {
+    ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Info, &format!($($arg)+)))
+}
+
+/// Logs a message at the notice level into the mosquitto logging subsystem.
+///
+/// # Examples
+///
+/// ```no_run
+/// use mosquitto_plugin::mosquitto_notice;
+///
+/// # fn main() {
+/// let client_id = "unknown";
+/// mosquitto_notice!("Authentication of client id {} is pending", client_id);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! mosquitto_notice {
+    ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Notice, &format!($($arg)+)))
+}
+
+/// Logs a message at the notice level into the mosquitto logging subsystem.
+///
+/// # Examples
+///
+/// ```no_run
+/// use mosquitto_plugin::mosquitto_warn;
+///
+/// # fn main() {
+/// let auth_method = "SIP";
+/// let client_id = "unknown";
+/// mosquitto_warn!("Client id {} tries unspported authentification method {}", client_id, auth_method);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! mosquitto_warn {
+    // mosquitto_warn!("a {} event", "log")
+    ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Warning, &format!($($arg)+)))
+}
+
+/// Logs a message at the notice level into the mosquitto logging subsystem.
+///
+/// # Examples
+///
+/// ```no_run
+/// use mosquitto_plugin::mosquitto_error;
+///
+/// # fn main() {
+/// let client_id: Option<&str> = None;
+/// mosquitto_error!("Failed acl check for client id {:?}", client_id);
+/// # }
+/// ```
+#[macro_export]
+macro_rules! mosquitto_error {
+    // mosquitto_error!("a {} event", "log")
+    ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Err, &format!($($arg)+)))
 }
