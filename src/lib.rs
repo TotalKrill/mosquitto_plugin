@@ -136,6 +136,11 @@ pub enum Error {
     QosNotSupported,
     OversizePacket,
     OCSP,
+    Timeout,
+    RetainNotSupported,
+    TopicAliasInvalid,
+    AdministrativeAction,
+    AlreadyExists,
 }
 
 impl From<Error> for i32 {
@@ -171,9 +176,58 @@ impl From<Error> for i32 {
             Error::QosNotSupported => 24,
             Error::OversizePacket => 25,
             Error::OCSP => 26,
+            Error::Timeout => 27,
+            Error::RetainNotSupported => 28,
+            Error::TopicAliasInvalid => 29,
+            Error::AdministrativeAction => 30,
+            Error::AlreadyExists => 31,
         }
     }
 }
+
+impl From<i32> for Error {
+    fn from(error: i32) -> Self {
+        match error {
+            -4 => Error::AuthContinue(Vec::with_capacity(0)),
+            -3 => Error::NoSubscriber,
+            -2 => Error::SubExists,
+            -1 => Error::ConnPending,
+            1 => Error::NoMem,
+            2 => Error::Protocol,
+            3 => Error::Inval,
+            4 => Error::NoConn,
+            5 => Error::ConnRefused,
+            6 => Error::NotFound,
+            7 => Error::ConnLost,
+            8 => Error::Tls,
+            9 => Error::PayloadSize,
+            10 => Error::NotSupported,
+            11 => Error::Auth,
+            12 => Error::AclDenied,
+            13 => Error::Unknown,
+            14 => Error::Errno,
+            15 => Error::Eai,
+            16 => Error::Proxy,
+            17 => Error::PluginDefer,
+            18 => Error::MalformedUtf8,
+            19 => Error::Keepalive,
+            20 => Error::Lookup,
+            21 => Error::MalformedPacket,
+            22 => Error::DuplicateProperty,
+            23 => Error::TlsHandshake,
+            24 => Error::QosNotSupported,
+            25 => Error::OversizePacket,
+            26 => Error::OCSP,
+            27 => Error::Timeout,
+            28 => Error::RetainNotSupported,
+            29 => Error::TopicAliasInvalid,
+            30 => Error::AdministrativeAction,
+            31 => Error::AlreadyExists,
+            _ => Error::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Success;
 
