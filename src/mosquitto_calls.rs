@@ -125,7 +125,13 @@ pub enum LogLevel {
 /// Send a log message on `level` to the mosquitto logging subsystem.
 pub fn mosquitto_log(level: LogLevel, message: &str) {
     let message = CString::new(message).expect("invalid log message: contains a nul byte");
-    unsafe { mosquitto_log_printf(level as i32, message.as_ptr()) }
+    unsafe {
+        mosquitto_log_printf(
+            level as i32,
+            "%s\0".as_ptr() as *const c_char,
+            message.as_ptr(),
+        )
+    }
 }
 /// Logs a message at the debug level into the mosquitto logging subsystem.
 ///
