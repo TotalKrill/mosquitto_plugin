@@ -179,7 +179,7 @@ macro_rules! mosquitto_notice {
     ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Notice, &format!($($arg)+)))
 }
 
-/// Logs a message at the notice level into the mosquitto logging subsystem.
+/// Logs a message at the warn level into the mosquitto logging subsystem.
 ///
 /// # Examples
 ///
@@ -198,7 +198,7 @@ macro_rules! mosquitto_warn {
     ($($arg:tt)+) => ($crate::mosquitto_calls::mosquitto_log($crate::mosquitto_calls::LogLevel::Warning, &format!($($arg)+)))
 }
 
-/// Logs a message at the notice level into the mosquitto logging subsystem.
+/// Logs a message at the error level into the mosquitto logging subsystem.
 ///
 /// # Examples
 ///
