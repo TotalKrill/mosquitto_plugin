@@ -1,9 +1,13 @@
-use crate::mosquitto_dev::{mosquitto_broker_publish, mosquitto_log_printf, mosquitto_property};
+use crate::mosquitto_dev::{
+    mosquitto_broker_publish, mosquitto_kick_client_by_clientid, mosquitto_kick_client_by_username,
+    mosquitto_log_printf, mosquitto_property,
+};
 use crate::Error;
 use crate::{Success, QOS};
 use libc::c_void;
 use std::ffi::CString;
 use std::os::raw::c_char;
+use std::ptr::null;
 
 /// Broadcast a message from the broker
 /// If called in a username and password check the connecting client will not get the message
@@ -18,7 +22,7 @@ pub fn publish_broadcast(
     let bytes = cstr.as_bytes_with_nul();
     let topic = bytes.as_ptr();
 
-    let nullptr: *const c_void = std::ptr::null();
+    let nullptr: *const c_void = null();
     let properties: *mut mosquitto_property = std::ptr::null_mut();
 
     // let payload: *mut c_void = std::ptr::null_mut(); // payload bytes, non-null if payload length > 0, must be heap allocated
@@ -97,6 +101,41 @@ pub fn publish_to_client(
     }
 }
 
+/// Forcefully disconnect all clients from the broker.
+///
+/// If `with_will` is true, then if the client has a Last Will and Testament
+/// defined then this will be sent. If false, the LWT will not be sent.
+pub fn kick_all_clients(with_will: bool) -> Result<Success, Error> {
+    match unsafe { mosquitto_kick_client_by_clientid(null(), with_will) } {
+        0 => Ok(Success),
+        error => Err(Error::from(error)),
+    }
+}
+
+/// Forcefully disconnect the client matching `client_id` from the broker.
+///
+/// If `with_will` is true, then if the client has a Last Will and Testament
+/// defined then this will be sent. If false, the LWT will not be sent.
+pub fn kick_client_by_clientid(client_id: &str, with_will: bool) -> Result<Success, Error> {
+    let client_id = CString::new(client_id).map_err(|_| Error::Inval)?;
+    match unsafe { mosquitto_kick_client_by_clientid(client_id.as_ptr(), with_will) } {
+        0 => Ok(Success),
+        error => Err(Error::from(error)),
+    }
+}
+
+/// Forcefully disconnect the client connected with username `username` from the broker.
+///
+/// If `with_will` is true, then if the client has a Last Will and Testament
+/// defined then this will be sent. If false, the LWT will not be sent.
+pub fn kick_client_by_username(username: &str, with_will: bool) -> Result<Success, Error> {
+    let username = CString::new(username).map_err(|_| Error::Inval)?;
+    match unsafe { mosquitto_kick_client_by_username(username.as_ptr(), with_will) } {
+        0 => Ok(Success),
+        error => Err(Error::from(error)),
+    }
+}
+
 /// Mosquitto log level.
 #[repr(C)]
 pub enum LogLevel {
@@ -133,6 +172,7 @@ pub fn mosquitto_log(level: LogLevel, message: &str) {
         )
     }
 }
+
 /// Logs a message at the debug level into the mosquitto logging subsystem.
 ///
 /// # Examples
