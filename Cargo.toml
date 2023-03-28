@@ -1,6 +1,6 @@
 [package]
 name = "mosquitto-plugin"
-version = "2.1.2"
+version = "2.1.3"
 authors = ["Kristoffer Ödmark <kristoffer.odmark90@gmail.com>"]
 edition = "2018"
 readme = "README.md"
@@ -20,4 +20,4 @@ crate-type = ["cdylib"]
 libc = "0.2"
 
 [build-dependencies]
-bindgen = { version = "0.59", default-features = false, features = ["runtime"] }
+bindgen = { version = "0.64", default-features = false, features = ["runtime"] }
