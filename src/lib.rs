@@ -313,7 +313,7 @@ pub trait MosquittoClientContext {
     /// Binding to mosquitto_client_sub_count
     fn get_sub_count(&self) -> i32;
     /// Binding to mosquitto_client_username
-    fn get_username(&self) -> String;
+    fn get_username(&self) -> Option<String>;
     /// Binding to mosquitto_set_username
     /// Error is either NoMem or Inval
     fn set_username(&self, username: String) -> Result<Success, Error>;
@@ -420,15 +420,19 @@ impl MosquittoClientContext for MosquittoClient {
         unsafe { mosquitto_client_sub_count(self.client) as i32 }
     }
 
-    fn get_username(&self) -> String {
+    fn get_username(&self) -> Option<String> {
         debug_assert!(!self.client.is_null(), "get_username: self client is null");
         unsafe {
             let username = mosquitto_client_username(self.client);
-            let c_str = std::ffi::CStr::from_ptr(username);
-            c_str
-                .to_str()
-                .expect("Couldn't convert CStr to &str")
-                .to_string() // TODO should we avoid expect here and instead return Option<String>?
+            if username.is_null() {
+                None
+            } else {
+                let c_str = std::ffi::CStr::from_ptr(username);
+                c_str
+                    .to_str()
+                    .ok()
+                    .map(From::from)
+            }
         }
     }
 
