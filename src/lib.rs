@@ -10,7 +10,6 @@ use std::fmt;
 
 pub mod dynlib;
 
-pub use dynlib::*;
 pub use libc;
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -25,7 +24,7 @@ pub fn __from_ptr_and_size<'a>(opts: *mut mosquitto_opt, count: usize) -> Mosqui
     for i in 0..count {
         // manually increment the pointers according to the coun value
         let opt = unsafe {
-            let opt = optsval + i as usize * std::mem::size_of::<mosquitto_opt>();
+            let opt = optsval + i * std::mem::size_of::<mosquitto_opt>();
             (opt as *mut mosquitto_opt)
                 .as_ref()
                 .expect("Failed to extract from ptr and size")
@@ -428,10 +427,7 @@ impl MosquittoClientContext for MosquittoClient {
                 None
             } else {
                 let c_str = std::ffi::CStr::from_ptr(username);
-                c_str
-                    .to_str()
-                    .ok()
-                    .map(From::from)
+                c_str.to_str().ok().map(From::from)
             }
         }
     }
