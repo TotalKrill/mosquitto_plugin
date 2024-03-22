@@ -16,7 +16,7 @@ pub struct AuthPlugin;
 // Required trait implementation
 impl MosquittoPlugin for AuthPlugin {
     fn init(_opts: HashMap<&str, &str>) -> Self {
-        AuthPlugin::default()
+        AuthPlugin
     }
 
     fn on_disconnect(&mut self, client: &dyn MosquittoClientContext, _reason: i32) {

@@ -27,11 +27,10 @@ pub fn publish_broadcast(
 
     // let payload: *mut c_void = std::ptr::null_mut(); // payload bytes, non-null if payload length > 0, must be heap allocated
     let payload_len = payload.len();
-    let payload: *const c_void = Box::new(payload).as_ptr() as *const c_void; // payload bytes, non-null if payload length > 0, must be heap allocated
+    let payload: *const c_void = payload.as_ptr() as *const c_void; // payload bytes, non-null if payload length > 0, must be heap allocated
 
     unsafe {
-        let c_payload: *mut c_void =
-            libc::malloc(std::mem::size_of::<u8>() * payload_len) as *mut c_void;
+        let c_payload: *mut c_void = libc::malloc(std::mem::size_of_val(&payload));
         payload.copy_to(c_payload, payload_len);
         /*
          * https://mosquitto.org/api2/files/mosquitto_broker-h.html#mosquitto_broker_publish
@@ -76,11 +75,10 @@ pub fn publish_to_client(
     let topic = bytes.as_ptr();
 
     let payload_len = payload.len();
-    let payload: *const c_void = Box::new(payload).as_ptr() as *const c_void;
+    let payload: *const c_void = payload.as_ptr() as *const c_void;
 
     unsafe {
-        let c_payload: *mut c_void =
-            libc::malloc(std::mem::size_of::<u8>() * payload_len) as *mut c_void;
+        let c_payload: *mut c_void = libc::malloc(std::mem::size_of_val(&payload));
         payload.copy_to(c_payload, payload_len);
 
         let res = mosquitto_broker_publish(
